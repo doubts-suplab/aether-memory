@@ -1,0 +1,110 @@
+# EEIK Project Manifest — Aether Memory
+# Generated from eeik-bootstrap manifest-template.yaml
+# Repo: suplab/aether-memory
+
+project:
+  name: aether-memory
+  description: >
+    Shared team and organisational memory platform for the Aether ecosystem. Generalises
+    Aether Core's per-user cognition to groups (team memory, shared reinforcement), adds
+    per-tenant governance policy, and provides a privacy-preserving federation API for
+    cross-instance memory queries.
+  owning_team: suplab
+  business_domain: generic
+  project_type: memory-platform
+
+technology:
+  backend:
+    language: java
+    version: "21"
+    framework: spring-boot
+    framework_version: "3.3.x"
+  database:
+    type: postgresql
+    version: "16"
+    migration_tool: flyway
+    orm: spring-data-jdbc
+    extensions:
+      - pgvector
+  vector_store:
+    primary: pgvector
+  llm:
+    runtime: ollama
+    embedding_model: all-MiniLM-L6-v2
+    embedding_dimensions: 384
+
+architecture:
+  style: modular-monolith
+  runnable_applications:
+    - name: memory-api
+      role: platform-api
+      port: 8083
+  design_patterns:
+    - hexagonal-architecture
+    - domain-driven-design
+    - policy-as-code
+    - privacy-by-design
+  api_style: rest
+
+capabilities:
+  owns:
+    - shared-memory
+  detail:
+    - team-memory
+    - shared-reinforcement
+    - memory-federation-api
+    - configurable-policies
+
+memory:
+  memory_pattern: vector-store
+  memory_types:
+    - episodic
+    - semantic
+    - procedural
+    - emotional
+  visibility_levels:
+    - private
+    - tenant
+    - federated
+
+governance:
+  profile: enterprise
+  multi_tenancy: tenant-and-team-scoped
+  federation:
+    default: opt-in
+    privacy_preserving: true
+  compliance:
+    - GDPR
+  policy_as_code: true
+
+observability:
+  logging: slf4j-structured
+  metrics: micrometer-prometheus
+
+delivery:
+  team_structure: solo
+  methodology: incremental
+  cicd_platform: github-actions
+  branch_strategy: feature-branches
+  commit_convention: conventional-commits
+
+ecosystem:
+  layer: platform
+  consumes: []
+  consumed_by:
+    - aether-vault
+    - aether-flow
+    - aether-enterprise
+  sibling_repositories:
+    - suplab/aether
+    - suplab/aether-core
+    - suplab/aether-grid
+
+bootstrap:
+  source: eeik-bootstrap
+  source_repo: suplab/eeik-bootstrap
+  capability_packs_activated:
+    - java
+    - ai-engineering
+    - architecture
+    - governance

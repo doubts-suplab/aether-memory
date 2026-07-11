@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: aether-memory
+  namespace: aether-memory
+  labels:
+    app: aether-memory
+    app.kubernetes.io/name: aether-memory
+    app.kubernetes.io/part-of: aether
+spec:
+  type: ClusterIP
+  selector:
+    app: aether-memory
+  ports:
+    - name: http
+      port: 8083
+      targetPort: 8083
+      protocol: TCP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: aether-memory
+  namespace: aether-memory
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: aether-memory
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: aether-memory
+  namespace: aether-memory
+  labels:
+    app.kubernetes.io/name: aether-memory
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aether-memory-config
+  namespace: aether-memory
+data:
+  ollama-base-url: "http://ollama:11434"
+  embedding-enabled: "true"
+  embedding-model: "all-minilm"
+  memory-decay-enabled: "true"
+  memory-decay-rate: "0.01"
+  memory-decay-after-days: "7"
+  memory-archive-threshold: "0.1"
+---
+# Template only — never commit actual values
+# kubectl create secret generic aether-memory-secrets \
+#   --from-literal=postgres-url=jdbc:postgresql://... \
+#   --from-literal=postgres-user=aether \
+#   --from-literal=postgres-password=<secret>
+apiVersion: v1
+kind: Secret
+metadata:
+  name: aether-memory-secrets
+  namespace: aether-memory
+type: Opaque
+data: {}  # Populated externally — never in source control
