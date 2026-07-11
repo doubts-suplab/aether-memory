@@ -5,12 +5,12 @@
 
 ---
 
-**Active Phase:** Phase 0 — Scaffold ✅ (complete)
+**Active Phase:** Phase 2 — Federation (next)
 
 | Phase | Name | Status | Sessions |
 |---|---|---|---|
 | 0 | Scaffold | ✅ Complete | 1 |
-| 1 | Shared Memory Engine | ⏳ Planned | — |
+| 1 | Shared Memory Engine | ✅ Complete | 1 |
 | 2 | Federation | ⏳ Planned | — |
 | 3 | Governance & Policy | ⏳ Planned | — |
 | 4 | Kubernetes + Helm | ⏳ Planned | — |
@@ -70,3 +70,28 @@
 **Docs:**
 - `README.md`, `docs/index.html`, `docs/architecture.md`, `docs/roadmap.md`, `docs/progress.md`
 - GitHub Actions: `ci.yml`, `quality-gate.yml`, `docker-build.yml`
+
+---
+
+## Phase 1 — Shared Memory Engine ✅
+
+**Commit:** `feat(memory): Phase 1 — semantic search + contribute API with policy-sourced reinforcement`
+
+### What was done
+
+**Port (`memory-domain`):**
+- `SharedMemoryStore.contribute(memoryId, scope, increment)` → `Optional<SharedMemory>` — the shared-reinforcement write path
+
+**Engine (`memory-engine`):**
+- `PGVectorSharedMemoryStore.contribute` — atomic `UPDATE … SET contributor_count = contributor_count + 1, strength = LEAST(1.0, strength + :increment), last_accessed_at = NOW() … RETURNING …`; scoped by tenant + team; returns empty when nothing matches
+
+**API (`memory-api`):**
+- `GET /api/v1/tenants/{t}/teams/{team}/memories/search?q=&limit=` — semantic retrieval via `findSimilar`, reinforced on read, embedding-optional (zero-vector fallback)
+- `POST /api/v1/tenants/{t}/teams/{team}/memories/{memoryId}/contribute` — records an additional contributor; 200 with updated view, 404 when absent
+- Reinforcement increment resolved from the tenant's `MemoryPolicy` end-to-end (search, list-by-type, contribute)
+
+**Tests:**
+- Unit suite unchanged and green (45 tests)
+- `PGVectorSharedMemoryStoreIT` extended: `contribute` increments count + strength, caps at 1.0, returns empty for unknown id, and does not cross the team boundary (Testcontainers, CI)
+
+### Files changed: 4 (+ docs)

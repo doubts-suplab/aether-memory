@@ -5,6 +5,7 @@ import com.suplab.aether.memory.domain.MemoryType;
 import com.suplab.aether.memory.domain.SharedMemory;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -63,6 +64,19 @@ public interface SharedMemoryStore {
      * @return ordered list of federatable memories (nearest first); not reinforced
      */
     List<SharedMemory> findFederatable(float[] queryEmbedding, MemoryType type, int limit);
+
+    /**
+     * Records a distinct additional contributor for an existing memory: {@code contributorCount}
+     * is incremented and strength reinforced by {@code increment} (capped at 1.0), atomically.
+     * This is the "shared reinforcement" write path — the more members that independently assert
+     * a memory, the stronger it becomes.
+     *
+     * @param memoryId  the memory being re-asserted
+     * @param scope     the owning tenant + team (enforces scoping)
+     * @param increment strength gained from the new contributor (from tenant policy)
+     * @return the updated memory, or {@link Optional#empty()} if no memory matched the scope
+     */
+    Optional<SharedMemory> contribute(UUID memoryId, MemoryScope scope, double increment);
 
     /**
      * Hard-deletes a specific memory. The scope is required to prevent cross-team deletion.

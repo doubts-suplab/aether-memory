@@ -14,6 +14,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -168,6 +169,34 @@ public class PGVectorSharedMemoryStore implements SharedMemoryStore {
                 rs.getTimestamp("created_at").toInstant(),
                 rs.getTimestamp("last_accessed_at").toInstant()
         );
+    }
+
+    @Override
+    public Optional<SharedMemory> contribute(UUID memoryId, MemoryScope scope, double increment) {
+        var sql = """
+                UPDATE shared_memories
+                SET contributor_count = contributor_count + 1,
+                    strength = LEAST(1.0, strength + :increment),
+                    last_accessed_at = NOW()
+                WHERE id = :id AND tenant_id = :tenantId AND team_id = :teamId
+                RETURNING id, tenant_id, team_id, memory_type, content, visibility, strength,
+                          access_count, contributor_count, created_at, last_accessed_at
+                """;
+        var params = new MapSqlParameterSource()
+                .addValue("id", memoryId)
+                .addValue("tenantId", scope.tenantId())
+                .addValue("teamId", scope.teamId())
+                .addValue("increment", increment);
+        var updated = jdbc.query(sql, params, this::mapRow);
+        if (updated.isEmpty()) {
+            log.debug("Contribute no-op — no memory matched id={} tenantId={} teamId={}",
+                    memoryId, scope.tenantId(), scope.teamId());
+            return Optional.empty();
+        }
+        var memory = updated.getFirst();
+        log.debug("Contributed to shared memory id={} contributorCount={} strength={}",
+                memory.id(), memory.contributorCount(), memory.strength());
+        return Optional.of(memory);
     }
 
     @Override

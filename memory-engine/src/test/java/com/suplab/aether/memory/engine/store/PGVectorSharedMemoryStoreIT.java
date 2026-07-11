@@ -155,6 +155,53 @@ class PGVectorSharedMemoryStoreIT {
     }
 
     @Test
+    void contribute_incrementsContributorCountAndStrength() {
+        var scope = uniqueScope();
+        var memory = new SharedMemory(UUID.randomUUID(), scope.tenantId(), scope.teamId(),
+                MemoryType.PROCEDURAL, "shared runbook", MemoryVisibility.TENANT, 0.5, 0, 1,
+                java.time.Instant.now(), java.time.Instant.now());
+        store.save(memory, new float[384]);
+
+        var updated = store.contribute(memory.id(), scope, INCREMENT);
+
+        assertThat(updated).isPresent();
+        assertThat(updated.get().contributorCount()).isEqualTo(2);
+        assertThat(updated.get().strength()).isCloseTo(0.6, within(0.001));
+    }
+
+    @Test
+    void contribute_capsStrengthAtOne() {
+        var scope = uniqueScope();
+        var memory = new SharedMemory(UUID.randomUUID(), scope.tenantId(), scope.teamId(),
+                MemoryType.SEMANTIC, "near-max", MemoryVisibility.PRIVATE, 0.95, 0, 1,
+                java.time.Instant.now(), java.time.Instant.now());
+        store.save(memory, new float[384]);
+
+        var updated = store.contribute(memory.id(), scope, INCREMENT);
+
+        assertThat(updated).isPresent();
+        assertThat(updated.get().strength()).isEqualTo(1.0);
+    }
+
+    @Test
+    void contribute_returnsEmptyForUnknownMemory() {
+        var scope = uniqueScope();
+
+        assertThat(store.contribute(UUID.randomUUID(), scope, INCREMENT)).isEmpty();
+    }
+
+    @Test
+    void contribute_doesNotCrossTeamBoundary() {
+        var teamA = uniqueScope();
+        var teamB = new MemoryScope(teamA.tenantId(), teamA.teamId() + "-b");
+        var memory = SharedMemory.create(teamA, MemoryType.SEMANTIC, "team A only", MemoryVisibility.PRIVATE);
+        store.save(memory, new float[384]);
+
+        // Attempt to contribute using team B's scope must not match.
+        assertThat(store.contribute(memory.id(), teamB, INCREMENT)).isEmpty();
+    }
+
+    @Test
     void save_upsertUpdatesExistingRecord() {
         var scope = uniqueScope();
         var memory = SharedMemory.create(scope, MemoryType.SEMANTIC, "original", MemoryVisibility.PRIVATE);

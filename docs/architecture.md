@@ -59,7 +59,7 @@ FederatedMemory    = (type, summary≤280, strength, provenance)   — privacy-p
 
 | Port | Implementation | Purpose |
 |---|---|---|
-| `SharedMemoryStore` | `PGVectorSharedMemoryStore` | Persist/retrieve team memory; reinforce on read; federatable fan-out |
+| `SharedMemoryStore` | `PGVectorSharedMemoryStore` | Persist/retrieve team memory; reinforce on read; atomic `contribute`; federatable fan-out |
 | `MemoryPolicyStore` | `JdbcMemoryPolicyStore` | Resolve/save per-tenant policy (defaults when unset) |
 | `MemoryFederationPort` | `DefaultMemoryFederationService` | Privacy-preserving cross-instance query |
 | `MemoryLifecyclePort` | `PolicyAwareMemoryLifecycleService` | Per-tenant decay + archive |
@@ -84,6 +84,8 @@ All embeddings are 384-dim (all-MiniLM-L6-v2), consistent across the ecosystem.
 ### 5.1 Store & retrieve (team-scoped)
 1. `POST …/teams/{teamId}/memories` → embed content via Ollama → `SharedMemoryStore.save` (UPSERT).
 2. `GET …/teams/{teamId}/memories?type=` → `findByType` orders by strength, **reinforces on read** using the tenant's `reinforcementIncrement`, persists the reinforced state.
+3. `GET …/teams/{teamId}/memories/search?q=` → embed the query → `findSimilar` (cosine), reinforced on read (same policy-sourced increment).
+4. `POST …/teams/{teamId}/memories/{id}/contribute` → `SharedMemoryStore.contribute` runs a single atomic `UPDATE … SET contributor_count = contributor_count + 1, strength = LEAST(1.0, strength + increment), last_accessed_at = NOW() … RETURNING …`, scoped by tenant + team; returns 404 when nothing matches.
 
 ### 5.2 Federation (privacy-preserving)
 1. `POST /api/v1/federation/query` → `DefaultMemoryFederationService` embeds `queryText`.

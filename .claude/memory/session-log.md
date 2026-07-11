@@ -2,6 +2,14 @@
 
 > Rolling log of working sessions. Newest first.
 
+## Session 1 — Phase 1 Shared Memory Engine
+- Added `SharedMemoryStore.contribute(memoryId, scope, increment)` → `Optional<SharedMemory>`; implemented atomically in `PGVectorSharedMemoryStore` (`UPDATE … RETURNING`, strength capped via `LEAST(1.0, …)`).
+- Added `GET …/memories/search?q=` (semantic `findSimilar`, reinforced on read) and `POST …/memories/{id}/contribute` (404 when absent) to `SharedMemoryController`.
+- Reinforcement increment now resolved from the tenant `MemoryPolicy` across search, list-by-type, and contribute.
+- Extended `PGVectorSharedMemoryStoreIT` with 4 contribute scenarios; updated federation test fake for the new port method. 45 unit tests green.
+- Synced docs: roadmap (P1 ✅), progress (P1 section), README + index.html API tables, architecture flows.
+- PR #1 opened for the branch (scaffold + Phase 1).
+
 ## Session 1 — Phase 0 Scaffold
 - Bootstrapped the standalone `aether-memory` platform mirroring `aether-core`'s structure and quality bar.
 - Created 4 modules: `memory-domain`, `memory-engine`, `memory-api`, `memory-infra`.

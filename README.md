@@ -32,6 +32,8 @@ cd ../.. && mvn spring-boot:run -pl memory-api
 |---|---|---|
 | `POST` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories` | Store a new shared memory |
 | `GET` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories?type=SEMANTIC` | Retrieve by type (reinforces on read) |
+| `GET` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories/search?q=` | Semantic similarity search (reinforces on read) |
+| `POST` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories/{memoryId}/contribute` | Record an additional contributor (shared reinforcement) |
 | `GET` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories/count` | Active memory count for a team |
 | `DELETE` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories/{memoryId}` | Delete a specific memory |
 | `POST` | `/api/v1/federation/query` | Privacy-preserving cross-instance memory query |
