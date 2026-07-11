@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Aether Memory — Shared Team Memory Platform</title>
+  <style>
+    :root {
+      --bg: #0a0a0b;
+      --surface: #111114;
+      --border: #1e1e24;
+      --text: #e8e8f0;
+      --muted: #6b6b80;
+      --accent: #3ecf8e;
+      --accent2: #4fa3e0;
+      --purple: #7c6af7;
+      --yellow: #f5a623;
+      --red: #e05c5c;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; line-height: 1.6; font-size: 15px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    .hero { padding: 5rem 2rem 4rem; text-align: center; border-bottom: 1px solid var(--border); }
+    .hero-eyebrow { font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); margin-bottom: 1.2rem; }
+    .hero h1 { font-size: clamp(2rem, 5vw, 3.4rem); font-weight: 800; letter-spacing: -0.04em; margin-bottom: 1rem; }
+    .hero h1 span { color: var(--accent); }
+    .hero-sub { color: var(--muted); max-width: 580px; margin: 0 auto 2rem; font-size: 1.05rem; }
+    .badges { display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: center; }
+    .badge { font-size: 0.72rem; padding: 0.3rem 0.75rem; border: 1px solid var(--border); border-radius: 20px; color: var(--muted); letter-spacing: 0.05em; }
+    .badge.accent { border-color: var(--accent); color: var(--accent); }
+    .badge.green { border-color: var(--accent); color: var(--accent); }
+    .sister-callout { margin-top: 2rem; padding: 1rem 1.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; display: inline-block; text-align: left; }
+    .sister-callout .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); margin-bottom: 0.3rem; }
+    .sister-callout a { font-weight: 600; }
+
+    .section { max-width: 960px; margin: 0 auto; padding: 4rem 2rem; }
+    .section-label { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); margin-bottom: 0.6rem; }
+    .section h2 { font-size: 1.9rem; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 0.6rem; }
+    .section-intro { color: var(--muted); max-width: 640px; margin-bottom: 2.5rem; }
+    hr.divider { border: none; border-top: 1px solid var(--border); margin: 0; }
+
+    .memory-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; }
+    .memory-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.5rem; }
+    .memory-card .type { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--accent); margin-bottom: 0.5rem; }
+    .memory-card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.5rem; }
+    .memory-card p { font-size: 0.85rem; color: var(--muted); }
+
+    .vis-flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 0.75rem; }
+    .vis-step { flex: 1; min-width: 200px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 1.25rem 1.5rem; }
+    .vis-step .lvl { font-family: 'SF Mono', monospace; font-size: 0.8rem; font-weight: 700; color: var(--accent2); margin-bottom: 0.4rem; }
+    .vis-step p { font-size: 0.85rem; color: var(--muted); }
+    .vis-arrow { align-self: center; color: var(--muted); font-size: 1.2rem; }
+
+    .modules { display: flex; flex-direction: column; gap: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+    .module { padding: 1.5rem 2rem; border-bottom: 1px solid var(--border); display: grid; grid-template-columns: 180px 1fr; gap: 1.5rem; align-items: start; }
+    .module:last-child { border-bottom: none; }
+    .module:hover { background: var(--surface); }
+    .module-name { font-family: 'SF Mono', monospace; font-size: 0.9rem; font-weight: 700; color: var(--accent2); }
+    .module h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .module p { font-size: 0.85rem; color: var(--muted); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    thead th { text-align: left; padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); color: var(--muted); font-weight: 500; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; }
+    tbody td { padding: 0.65rem 1rem; border-bottom: 1px solid var(--border); }
+    tbody tr:last-child td { border-bottom: none; }
+    .method { font-family: 'SF Mono', monospace; font-size: 0.8rem; font-weight: 700; }
+    .method.get { color: var(--accent); }
+    .method.post { color: var(--purple); }
+    .method.delete { color: var(--red); }
+    .method.put { color: var(--yellow); }
+    code { font-family: 'SF Mono', monospace; font-size: 0.82rem; background: var(--surface); padding: 0.15rem 0.4rem; border-radius: 4px; border: 1px solid var(--border); }
+    .table-wrap { overflow-x: auto; }
+
+    .roadmap { display: flex; flex-direction: column; gap: 0; }
+    .roadmap-item { padding: 1.2rem 1.5rem; border: 1px solid var(--border); border-bottom: none; display: flex; align-items: center; gap: 1.2rem; }
+    .roadmap-item:first-child { border-radius: 10px 10px 0 0; }
+    .roadmap-item:last-child { border-bottom: 1px solid var(--border); border-radius: 0 0 10px 10px; }
+    .roadmap-item:hover { background: var(--surface); }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .dot.done { background: var(--accent); }
+    .dot.planned { background: var(--border); }
+    .roadmap-item .phase-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; width: 60px; flex-shrink: 0; }
+    .roadmap-item .phase-name { font-weight: 600; font-size: 0.92rem; flex: 1; }
+    .status-badge { font-size: 0.68rem; padding: 0.2rem 0.6rem; border-radius: 20px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+    .status-badge.done { background: rgba(62,207,142,0.1); color: var(--accent); border: 1px solid rgba(62,207,142,0.3); }
+    .status-badge.planned { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+
+    .tech-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; }
+    .tech-row { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 1rem; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; font-size: 0.85rem; }
+    .tech-row .layer { color: var(--muted); font-size: 0.78rem; }
+    .tech-row .value { font-weight: 600; text-align: right; }
+
+    footer { border-top: 1px solid var(--border); padding: 2.5rem 2rem; text-align: center; color: var(--muted); font-size: 0.82rem; }
+    footer .ecosystem { margin-bottom: 0.5rem; }
+  </style>
+</head>
+<body>
+
+<section class="hero">
+  <p class="hero-eyebrow">Part of the Aether Ecosystem · Platform Layer</p>
+  <h1>Aether <span>Memory</span></h1>
+  <p class="hero-sub">Shared team and organisational memory — collective cognition, per-tenant governance, and privacy-preserving federation across instances.</p>
+  <div class="badges">
+    <span class="badge green">Phase 0 — Scaffold</span>
+    <span class="badge accent">Next: Phase 1 — Shared Memory Engine</span>
+    <span class="badge">Java 21</span>
+    <span class="badge">Spring Boot 3.3</span>
+    <span class="badge">pgvector</span>
+    <span class="badge">Port 8083</span>
+  </div>
+  <div class="sister-callout">
+    <div class="label">Complements</div>
+    <a href="https://github.com/suplab/aether-core">suplab/aether-core</a> — personal cognition for an individual. Aether Memory is the shared mind for a <em>team</em>.
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<section class="section">
+  <p class="section-label">Memory Model</p>
+  <h2>Four Types of Shared Memory</h2>
+  <p class="section-intro">The four-type cognitive model of Aether Core, generalised from an individual to a group. Every memory is embedded (384-dim), stored in PostgreSQL with pgvector, strengthened by collective access, and decayed when the team stops relying on it.</p>
+  <div class="memory-grid">
+    <div class="memory-card">
+      <div class="type">Episodic</div>
+      <h3>Team Events</h3>
+      <p>Shared experiences: "the Q3 incident retrospective and what we changed after it."</p>
+    </div>
+    <div class="memory-card">
+      <div class="type">Semantic</div>
+      <h3>Org Facts</h3>
+      <p>Organisational knowledge: "our SLA is 99.95% and the escalation path is on-call → lead."</p>
+    </div>
+    <div class="memory-card">
+      <div class="type">Procedural</div>
+      <h3>Playbooks</h3>
+      <p>Shared conventions: "how the team ships — trunk-based, gated by the quality workflow."</p>
+    </div>
+    <div class="memory-card">
+      <div class="type">Emotional</div>
+      <h3>Team Affect</h3>
+      <p>Collective sentiment: "morale after the launch — energised, some burnout risk flagged."</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<section class="section">
+  <p class="section-label">Access Control</p>
+  <h2>Visibility Widens Outward — Sharing Is Opt-In</h2>
+  <p class="section-intro">A memory's reach is explicit. Federation only ever sees the outermost ring, and only for tenants that have opted in — privacy is the default.</p>
+  <div class="vis-flow">
+    <div class="vis-step">
+      <div class="lvl">PRIVATE</div>
+      <p>Visible only to the owning team (<code>tenantId</code> + <code>teamId</code>).</p>
+    </div>
+    <div class="vis-arrow">→</div>
+    <div class="vis-step">
+      <div class="lvl">TENANT</div>
+      <p>Visible to every team within the same tenant.</p>
+    </div>
+    <div class="vis-arrow">→</div>
+    <div class="vis-step">
+      <div class="lvl">FEDERATED</div>
+      <p>Eligible for privacy-preserving cross-instance queries — bounded summaries, coarse provenance, no team identity.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<section class="section">
+  <p class="section-label">Architecture</p>
+  <h2>Four Maven Modules</h2>
+  <p class="section-intro">Strict inward dependency: <code>memory-api → memory-engine → memory-domain</code>. The domain is pure Java 21 — no framework coupling.</p>
+  <div class="modules">
+    <div class="module">
+      <div><div class="module-name">memory-domain</div></div>
+      <div><h3>Domain &amp; Ports</h3><p>SharedMemory, MemoryScope, MemoryVisibility, MemoryPolicy, FederatedMemory + port interfaces. No Spring.</p></div>
+    </div>
+    <div class="module">
+      <div><div class="module-name">memory-engine</div></div>
+      <div><h3>Adapters &amp; Services</h3><p>pgvector store (reinforce-on-read), Ollama embedding, policy-aware decay/archive, privacy-preserving federation.</p></div>
+    </div>
+    <div class="module">
+      <div><div class="module-name">memory-api</div></div>
+      <div><h3>REST API · Port 8083</h3><p>Spring Boot app, controllers, Flyway migrations, scheduled lifecycle, Micrometer metrics.</p></div>
+    </div>
+    <div class="module">
+      <div><div class="module-name">memory-infra</div></div>
+      <div><h3>Infrastructure</h3><p>Docker Compose, Kubernetes manifests, standalone migration copies. No Java sources.</p></div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<section class="section">
+  <p class="section-label">API Surface</p>
+  <h2>Key Endpoints</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><span class="method post">POST</span></td><td><code>/api/v1/tenants/{t}/teams/{team}/memories</code></td><td>Store a shared memory</td></tr>
+        <tr><td><span class="method get">GET</span></td><td><code>/api/v1/tenants/{t}/teams/{team}/memories?type=</code></td><td>Retrieve by type (reinforces on read)</td></tr>
+        <tr><td><span class="method get">GET</span></td><td><code>/api/v1/tenants/{t}/teams/{team}/memories/count</code></td><td>Active memory count</td></tr>
+        <tr><td><span class="method delete">DEL</span></td><td><code>/api/v1/tenants/{t}/teams/{team}/memories/{id}</code></td><td>Delete a memory</td></tr>
+        <tr><td><span class="method post">POST</span></td><td><code>/api/v1/federation/query</code></td><td>Privacy-preserving cross-instance query</td></tr>
+        <tr><td><span class="method put">PUT</span></td><td><code>/api/v1/tenants/{t}/memory-policy</code></td><td>Replace a tenant's governance policy</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<section class="section">
+  <p class="section-label">Delivery</p>
+  <h2>Roadmap</h2>
+  <div class="roadmap">
+    <div class="roadmap-item"><span class="dot done"></span><span class="phase-label">P0</span><span class="phase-name">Scaffold</span><span class="status-badge done">Complete</span></div>
+    <div class="roadmap-item"><span class="dot planned"></span><span class="phase-label">P1</span><span class="phase-name">Shared Memory Engine</span><span class="status-badge planned">Planned</span></div>
+    <div class="roadmap-item"><span class="dot planned"></span><span class="phase-label">P2</span><span class="phase-name">Federation</span><span class="status-badge planned">Planned</span></div>
+    <div class="roadmap-item"><span class="dot planned"></span><span class="phase-label">P3</span><span class="phase-name">Governance &amp; Policy</span><span class="status-badge planned">Planned</span></div>
+    <div class="roadmap-item"><span class="dot planned"></span><span class="phase-label">P4</span><span class="phase-name">Kubernetes + Helm</span><span class="status-badge planned">Planned</span></div>
+  </div>
+</section>
+
+<hr class="divider"/>
+
+<section class="section">
+  <p class="section-label">Foundation</p>
+  <h2>Technology Stack</h2>
+  <div class="tech-grid">
+    <div class="tech-row"><span class="layer">Language</span><span class="value">Java 21</span></div>
+    <div class="tech-row"><span class="layer">Framework</span><span class="value">Spring Boot 3.3.5</span></div>
+    <div class="tech-row"><span class="layer">Database</span><span class="value">PostgreSQL 16</span></div>
+    <div class="tech-row"><span class="layer">Vector Store</span><span class="value">pgvector (384-dim)</span></div>
+    <div class="tech-row"><span class="layer">Embedding</span><span class="value">all-MiniLM-L6-v2 · Ollama</span></div>
+    <div class="tech-row"><span class="layer">Migrations</span><span class="value">Flyway</span></div>
+    <div class="tech-row"><span class="layer">Metrics</span><span class="value">Micrometer · Prometheus</span></div>
+    <div class="tech-row"><span class="layer">Build</span><span class="value">Maven multi-module</span></div>
+    <div class="tech-row"><span class="layer">CI/CD</span><span class="value">GitHub Actions (OIDC)</span></div>
+  </div>
+</section>
+
+<footer>
+  <div class="ecosystem">
+    <a href="https://github.com/suplab/aether">aether</a> ·
+    <a href="https://github.com/suplab/aether-core">aether-core</a> ·
+    <a href="https://github.com/suplab/aether-grid">aether-grid</a> ·
+    <strong>aether-memory</strong>
+  </div>
+  <div>Shared Memory capability owner · Platform layer · Port 8083</div>
+</footer>
+
+</body>
+</html>

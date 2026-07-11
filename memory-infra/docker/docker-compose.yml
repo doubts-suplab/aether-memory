@@ -1,0 +1,35 @@
+services:
+  postgres-memory:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: aether_memory
+      POSTGRES_USER: aether
+      POSTGRES_PASSWORD: aether
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aether -d aether_memory"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres-memory-data:/var/lib/postgresql/data
+
+  aether-memory:
+    build:
+      context: ../..
+      dockerfile: memory-api/Dockerfile
+    ports:
+      - "8083:8083"
+    environment:
+      POSTGRES_URL: jdbc:postgresql://postgres-memory:5432/aether_memory
+      POSTGRES_USER: aether
+      POSTGRES_PASSWORD: aether
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      SPRING_PROFILES_ACTIVE: local
+    depends_on:
+      postgres-memory:
+        condition: service_healthy
+
+volumes:
+  postgres-memory-data:

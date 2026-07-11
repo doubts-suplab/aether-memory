@@ -1,0 +1,37 @@
+spring:
+  application:
+    name: aether-memory
+  datasource:
+    url: ${POSTGRES_URL:jdbc:postgresql://localhost:5432/aether_memory}
+    username: ${POSTGRES_USER:aether}
+    password: ${POSTGRES_PASSWORD:aether}
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: ${SERVER_PORT:8083}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+aether:
+  memory:
+    ollama:
+      base-url: ${OLLAMA_BASE_URL:http://localhost:11434}
+    embedding:
+      enabled: ${EMBEDDING_ENABLED:true}
+      model: ${EMBEDDING_MODEL:all-minilm}
+    lifecycle:
+      decay-enabled: ${MEMORY_DECAY_ENABLED:true}
+      decay-rate: ${MEMORY_DECAY_RATE:0.01}
+      decay-after-days: ${MEMORY_DECAY_AFTER_DAYS:7}
+      archive-threshold: ${MEMORY_ARCHIVE_THRESHOLD:0.1}
+      decay-cron: ${MEMORY_DECAY_CRON:0 0 3 * * *}
