@@ -2,14 +2,17 @@ package com.suplab.aether.memory.engine.federation;
 
 import com.suplab.aether.memory.domain.FederatedMemory;
 import com.suplab.aether.memory.domain.FederationQuery;
+import com.suplab.aether.memory.domain.MemoryPolicy;
 import com.suplab.aether.memory.domain.MemoryScope;
 import com.suplab.aether.memory.domain.MemoryType;
 import com.suplab.aether.memory.domain.MemoryVisibility;
 import com.suplab.aether.memory.domain.SharedMemory;
+import com.suplab.aether.memory.ports.MemoryPolicyStore;
 import com.suplab.aether.memory.ports.SharedMemoryStore;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -68,9 +71,37 @@ class DefaultMemoryFederationServiceTest {
         }
     }
 
+    /** Policy store returning per-tenant overrides, defaults otherwise. */
+    private static final class MapPolicyStore implements MemoryPolicyStore {
+        private final Map<String, MemoryPolicy> policies;
+
+        MapPolicyStore(Map<String, MemoryPolicy> policies) {
+            this.policies = policies;
+        }
+
+        @Override
+        public MemoryPolicy resolve(String tenantId) {
+            return policies.getOrDefault(tenantId, MemoryPolicy.defaults(tenantId));
+        }
+
+        @Override
+        public void save(MemoryPolicy policy) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
+        public List<MemoryPolicy> findAll() {
+            return List.copyOf(policies.values());
+        }
+    }
+
     private static SharedMemory federated(String tenantId, String teamId, String content) {
         return SharedMemory.create(MemoryScope.of(tenantId, teamId), MemoryType.SEMANTIC, content,
                 MemoryVisibility.FEDERATED);
+    }
+
+    private static DefaultMemoryFederationService service(SharedMemoryStore store, MemoryPolicyStore policies) {
+        return new DefaultMemoryFederationService(store, policies, Optional.empty());
     }
 
     @Test
@@ -78,7 +109,7 @@ class DefaultMemoryFederationServiceTest {
         var store = new RecordingStore(List.of(
                 federated("tenant-a", "team-x", "shared insight A"),
                 federated("tenant-b", "team-y", "shared insight B")));
-        var service = new DefaultMemoryFederationService(store, Optional.empty());
+        var service = service(store, new MapPolicyStore(Map.of()));
 
         var results = service.federatedSearch(new FederationQuery("tenant-c", null, "insight", 10));
 
@@ -91,9 +122,24 @@ class DefaultMemoryFederationServiceTest {
     }
 
     @Test
+    void federatedSearch_appliesSourceTenantRedactionDepth() {
+        var longContent = "x".repeat(200);
+        var store = new RecordingStore(List.of(federated("tenant-a", "team-x", longContent)));
+        // tenant-a redacts hard: only 20 chars exposed.
+        var policy = new MemoryPolicy("tenant-a", 0.01, 7, 0.1, 0.1, 90, true, 20);
+        var service = service(store, new MapPolicyStore(Map.of("tenant-a", policy)));
+
+        var results = service.federatedSearch(new FederationQuery("tenant-c", null, "insight", 10));
+
+        assertThat(results).hasSize(1);
+        assertThat(results.getFirst().summary()).hasSize(20);
+        assertThat(results.getFirst().summary()).endsWith("…");
+    }
+
+    @Test
     void federatedSearch_clampsLimitToMaximum() {
         var store = new RecordingStore(List.of());
-        var service = new DefaultMemoryFederationService(store, Optional.empty());
+        var service = service(store, new MapPolicyStore(Map.of()));
 
         service.federatedSearch(new FederationQuery("tenant-c", null, "insight",
                 DefaultMemoryFederationService.MAX_FEDERATION_LIMIT + 50));
@@ -104,7 +150,7 @@ class DefaultMemoryFederationServiceTest {
     @Test
     void federatedSearch_passesTypeFilterThrough() {
         var store = new RecordingStore(List.of());
-        var service = new DefaultMemoryFederationService(store, Optional.empty());
+        var service = service(store, new MapPolicyStore(Map.of()));
 
         service.federatedSearch(new FederationQuery("tenant-c", MemoryType.PROCEDURAL, "how-to", 5));
 
@@ -114,7 +160,7 @@ class DefaultMemoryFederationServiceTest {
     @Test
     void federatedSearch_returnsEmptyWhenNoFederatableMemories() {
         var store = new RecordingStore(List.of());
-        var service = new DefaultMemoryFederationService(store, Optional.empty());
+        var service = service(store, new MapPolicyStore(Map.of()));
 
         var results = service.federatedSearch(new FederationQuery("tenant-c", null, "insight", 10));
 

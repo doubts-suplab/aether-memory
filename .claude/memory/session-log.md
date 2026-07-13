@@ -2,6 +2,15 @@
 
 > Rolling log of working sessions. Newest first.
 
+## Session 1 — Phase 2 Federation
+- Added federation gateway (`MemoryFederationGateway`/`DefaultMemoryFederationGateway`): local search + peer fan-out, dedupe by (provenance, summary), rank by strength, clamp, audit.
+- Outbound `FederationPeerClient`/`HttpFederationPeerClient` calls peers at `…/federation/query?localOnly=true` (2s/5s timeouts, resilient to failures); controller sets `fanOut = !localOnly` to prevent recursion.
+- Federation audit: `FederationAuditEntry` + `FederationAuditStore`/`JdbcFederationAuditStore`, `federation_audit` table (V005).
+- Per-origin `FederationRateLimiter` (fixed window, injectable clock) → 429 in controller.
+- Per-tenant redaction depth: `MemoryPolicy.federationMaxSummaryLength` (V006) applied in `DefaultMemoryFederationService`; `FederatedMemory.from(..., maxLength)` overload.
+- Tests: FederationRateLimiterTest, DefaultMemoryFederationGatewayTest, JdbcFederationAuditStoreIT; updated federation service + policy tests for new signatures.
+- Docs synced (roadmap/progress/README/index.html/architecture). Pushed to branch (PR #1) without local build per request.
+
 ## Session 1 — Phase 1 Shared Memory Engine
 - Added `SharedMemoryStore.contribute(memoryId, scope, increment)` → `Optional<SharedMemory>`; implemented atomically in `PGVectorSharedMemoryStore` (`UPDATE … RETURNING`, strength capped via `LEAST(1.0, …)`).
 - Added `GET …/memories/search?q=` (semantic `findSimilar`, reinforced on read) and `POST …/memories/{id}/contribute` (404 when absent) to `SharedMemoryController`.

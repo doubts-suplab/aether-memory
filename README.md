@@ -59,7 +59,7 @@ Shared memories reuse the four-type cognitive model of Aether Core, generalised 
 | `TENANT` | Every team within the tenant |
 | `FEDERATED` | Eligible for cross-instance federation queries (opt-in per tenant) |
 
-Federation is privacy-preserving by construction: only `FEDERATED` memories in **federation-enabled** tenants are candidates, results are projected to length-bounded summaries with coarse provenance (source tenant, never the owning team), and the result count is capped.
+Federation is privacy-preserving by construction: only `FEDERATED` memories in **federation-enabled** tenants are candidates, results are projected to length-bounded summaries with coarse provenance (source tenant, never the owning team), and the result count is capped. Each tenant controls its own **redaction depth** (`federationMaxSummaryLength`). A query fans out to configured **peer instances** and merges results; inbound peer calls use `?localOnly=true` so federation never recurses. Every query is **audited** and **rate-limited per origin** (429 when exceeded).
 
 ### Shared Reinforcement & Decay
 
@@ -92,4 +92,7 @@ Aether Memory owns the **Shared Memory** capability exclusively. Personal memory
 | `MEMORY_DECAY_ENABLED` | `true` | Toggle the scheduled decay/archive lifecycle |
 | `MEMORY_DECAY_RATE` | `0.01` | Default strength lost per idle day (tenants may override) |
 | `MEMORY_ARCHIVE_THRESHOLD` | `0.1` | Default archive cutoff strength (tenants may override) |
+| `FEDERATION_PEERS` | _(empty)_ | Comma-separated peer Memory base URLs for fan-out (empty = local-only) |
+| `FEDERATION_RATE_CAPACITY` | `60` | Max federation queries per origin tenant per window |
+| `FEDERATION_RATE_WINDOW_MILLIS` | `60000` | Rate-limit window length (ms) |
 | `SERVER_PORT` | `8083` | HTTP port |

@@ -5,13 +5,13 @@
 
 ---
 
-**Active Phase:** Phase 2 — Federation (next)
+**Active Phase:** Phase 3 — Governance & Policy (next)
 
 | Phase | Name | Status | Sessions |
 |---|---|---|---|
 | 0 | Scaffold | ✅ Complete | 1 |
 | 1 | Shared Memory Engine | ✅ Complete | 1 |
-| 2 | Federation | ⏳ Planned | — |
+| 2 | Federation | ✅ Complete | 1 |
 | 3 | Governance & Policy | ⏳ Planned | — |
 | 4 | Kubernetes + Helm | ⏳ Planned | — |
 
@@ -95,3 +95,37 @@
 - `PGVectorSharedMemoryStoreIT` extended: `contribute` increments count + strength, caps at 1.0, returns empty for unknown id, and does not cross the team boundary (Testcontainers, CI)
 
 ### Files changed: 4 (+ docs)
+
+---
+
+## Phase 2 — Federation ✅
+
+**Commit:** `feat(memory): Phase 2 — federation gateway, peer fan-out, audit, rate limiting, redaction depth`
+
+### What was done
+
+**Domain (`memory-domain`):**
+- `FederationAuditEntry` record (`record()` factory) — audits the *query*, never matched-memory identity
+- Ports: `FederationAuditStore`, `FederationPeerClient` (outbound), `MemoryFederationGateway` (orchestration)
+- `MemoryPolicy` gained `federationMaxSummaryLength` (per-tenant redaction depth, 1..280); `FederatedMemory.from(memory, provenance, maxLength)` overload
+
+**Engine (`memory-engine`):**
+- `JdbcFederationAuditStore` — persist + `recentFor`
+- `HttpFederationPeerClient` — calls peer `…/federation/query?localOnly=true` with 2s/5s timeouts; failures degrade to empty (one bad peer never fails the query)
+- `FederationRateLimiter` — per-origin fixed-window limiter, injectable clock, thread-safe
+- `DefaultMemoryFederationService` — now applies the source tenant's redaction depth per result
+- `DefaultMemoryFederationGateway` — local search + peer fan-out, dedupe by (provenance, summary) keeping strongest, rank by strength, clamp to limit, record audit
+
+**API (`memory-api`):**
+- `MemoryFederationController` — injects gateway + rate limiter; `?localOnly=true` for inbound peer calls (no recursion); 429 on rate-limit; 400 on bad input
+- `MemoryPolicyController` — read/replace `federationMaxSummaryLength`
+- `MemoryApiConfig` — beans: audit store, peer client, gateway (peers from `aether.memory.federation.peers`), rate limiter (capacity/window config)
+- `application.yml` — `aether.memory.federation.{peers,rate-limit.*}`
+
+**Migrations:** `V005__create_federation_audit.sql`, `V006__add_federation_redaction_depth.sql`
+
+**Tests:**
+- Unit: `FederationRateLimiterTest` (4), `DefaultMemoryFederationGatewayTest` (5), `DefaultMemoryFederationServiceTest` (+redaction), `MemoryPolicyTest` (+redaction validation)
+- IT (Testcontainers): `JdbcFederationAuditStoreIT` (4); `JdbcMemoryPolicyStoreIT` updated for the new column
+
+### Files changed: ~22

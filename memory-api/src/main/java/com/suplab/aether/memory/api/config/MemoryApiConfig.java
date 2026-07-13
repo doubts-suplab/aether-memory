@@ -1,10 +1,17 @@
 package com.suplab.aether.memory.api.config;
 
 import com.suplab.aether.memory.engine.embedding.SharedEmbeddingService;
+import com.suplab.aether.memory.engine.federation.DefaultMemoryFederationGateway;
 import com.suplab.aether.memory.engine.federation.DefaultMemoryFederationService;
+import com.suplab.aether.memory.engine.federation.FederationRateLimiter;
+import com.suplab.aether.memory.engine.federation.HttpFederationPeerClient;
+import com.suplab.aether.memory.engine.federation.JdbcFederationAuditStore;
 import com.suplab.aether.memory.engine.lifecycle.PolicyAwareMemoryLifecycleService;
 import com.suplab.aether.memory.engine.policy.JdbcMemoryPolicyStore;
 import com.suplab.aether.memory.engine.store.PGVectorSharedMemoryStore;
+import com.suplab.aether.memory.ports.FederationAuditStore;
+import com.suplab.aether.memory.ports.FederationPeerClient;
+import com.suplab.aether.memory.ports.MemoryFederationGateway;
 import com.suplab.aether.memory.ports.MemoryFederationPort;
 import com.suplab.aether.memory.ports.MemoryLifecyclePort;
 import com.suplab.aether.memory.ports.MemoryPolicyStore;
@@ -15,6 +22,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -44,13 +53,61 @@ public class MemoryApiConfig {
     }
 
     /**
-     * Creates the privacy-preserving federation service. The embedding service is optional so
+     * Creates the local privacy-preserving federation service. The embedding service is optional so
      * federation remains available (degraded to zero-vector matching) when Ollama is disabled.
+     * Redaction depth per federated result comes from the source tenant's policy.
      */
     @Bean
     public MemoryFederationPort memoryFederationPort(SharedMemoryStore memoryStore,
+                                                     MemoryPolicyStore policyStore,
                                                      Optional<SharedEmbeddingService> embeddingService) {
-        return new DefaultMemoryFederationService(memoryStore, embeddingService);
+        return new DefaultMemoryFederationService(memoryStore, policyStore, embeddingService);
+    }
+
+    /**
+     * Creates the federation audit store backed by the {@code federation_audit} table.
+     */
+    @Bean
+    public FederationAuditStore federationAuditStore(NamedParameterJdbcTemplate jdbc) {
+        return new JdbcFederationAuditStore(jdbc);
+    }
+
+    /**
+     * Creates the outbound HTTP client used to query peer Memory instances during fan-out.
+     */
+    @Bean
+    public FederationPeerClient federationPeerClient() {
+        return new HttpFederationPeerClient();
+    }
+
+    /**
+     * Creates the federation gateway that orchestrates local search + peer fan-out + audit.
+     *
+     * @param peersCsv comma-separated peer base URLs (empty by default — local-only federation)
+     */
+    @Bean
+    public MemoryFederationGateway memoryFederationGateway(
+            MemoryFederationPort localFederation,
+            FederationPeerClient peerClient,
+            FederationAuditStore auditStore,
+            @Value("${aether.memory.federation.peers:}") String peersCsv) {
+        List<String> peers = peersCsv == null || peersCsv.isBlank()
+                ? List.of()
+                : Arrays.stream(peersCsv.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+        return new DefaultMemoryFederationGateway(localFederation, peerClient, auditStore, peers);
+    }
+
+    /**
+     * Creates the per-origin federation rate limiter.
+     *
+     * @param capacity     max federation queries per origin per window (default 60)
+     * @param windowMillis window length in milliseconds (default 60000 = 1 minute)
+     */
+    @Bean
+    public FederationRateLimiter federationRateLimiter(
+            @Value("${aether.memory.federation.rate-limit.capacity:60}") int capacity,
+            @Value("${aether.memory.federation.rate-limit.window-millis:60000}") long windowMillis) {
+        return new FederationRateLimiter(capacity, windowMillis);
     }
 
     /**

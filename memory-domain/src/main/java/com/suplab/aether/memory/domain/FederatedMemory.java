@@ -32,17 +32,30 @@ public record FederatedMemory(
     }
 
     /**
-     * Projects a {@link SharedMemory} into a federated result, truncating content to
-     * {@link #MAX_SUMMARY_LENGTH} characters and reducing provenance to the supplied label.
+     * Projects a {@link SharedMemory} into a federated result at full redaction depth
+     * ({@link #MAX_SUMMARY_LENGTH}).
      *
      * @param memory     the source memory (must be {@link MemoryVisibility#FEDERATED})
      * @param provenance the coarse origin label to expose (never the raw {@code teamId})
      */
     public static FederatedMemory from(SharedMemory memory, String provenance) {
+        return from(memory, provenance, MAX_SUMMARY_LENGTH);
+    }
+
+    /**
+     * Projects a {@link SharedMemory} into a federated result, truncating content to the source
+     * tenant's configured redaction depth and reducing provenance to the supplied label.
+     *
+     * @param memory     the source memory (must be {@link MemoryVisibility#FEDERATED})
+     * @param provenance the coarse origin label to expose (never the raw {@code teamId})
+     * @param maxLength  redaction depth — clamped to {@code [1, MAX_SUMMARY_LENGTH]}
+     */
+    public static FederatedMemory from(SharedMemory memory, String provenance, int maxLength) {
+        int limit = Math.max(1, Math.min(maxLength, MAX_SUMMARY_LENGTH));
         var content = memory.content();
-        var summary = content.length() <= MAX_SUMMARY_LENGTH
+        var summary = content.length() <= limit
                 ? content
-                : content.substring(0, MAX_SUMMARY_LENGTH - 1) + "…";
+                : content.substring(0, limit - 1) + "…";
         return new FederatedMemory(memory.type(), summary, memory.strength(), provenance);
     }
 }

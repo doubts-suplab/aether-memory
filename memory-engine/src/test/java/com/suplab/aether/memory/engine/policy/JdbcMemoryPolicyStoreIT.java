@@ -48,7 +48,7 @@ class JdbcMemoryPolicyStoreIT {
     @Test
     void save_thenResolve_returnsStoredPolicy() {
         var tenantId = "tenant-" + UUID.randomUUID();
-        var custom = new MemoryPolicy(tenantId, 0.05, 3, 0.2, 0.15, 30, true);
+        var custom = new MemoryPolicy(tenantId, 0.05, 3, 0.2, 0.15, 30, true, 120);
 
         store.save(custom);
 
@@ -58,18 +58,19 @@ class JdbcMemoryPolicyStoreIT {
     @Test
     void save_isUpsert() {
         var tenantId = "tenant-" + UUID.randomUUID();
-        store.save(new MemoryPolicy(tenantId, 0.05, 3, 0.2, 0.15, 30, true));
-        store.save(new MemoryPolicy(tenantId, 0.02, 10, 0.1, 0.05, 60, false));
+        store.save(new MemoryPolicy(tenantId, 0.05, 3, 0.2, 0.15, 30, true, 120));
+        store.save(new MemoryPolicy(tenantId, 0.02, 10, 0.1, 0.05, 60, false, 200));
 
         var resolved = store.resolve(tenantId);
         assertThat(resolved.decayRate()).isEqualTo(0.02);
         assertThat(resolved.federationEnabled()).isFalse();
+        assertThat(resolved.federationMaxSummaryLength()).isEqualTo(200);
     }
 
     @Test
     void findAll_returnsOnlyConfiguredPolicies() {
         var tenantId = "tenant-" + UUID.randomUUID();
-        store.save(new MemoryPolicy(tenantId, 0.05, 3, 0.2, 0.15, 30, true));
+        store.save(new MemoryPolicy(tenantId, 0.05, 3, 0.2, 0.15, 30, true, 120));
 
         assertThat(store.findAll()).extracting(MemoryPolicy::tenantId).contains(tenantId);
     }
