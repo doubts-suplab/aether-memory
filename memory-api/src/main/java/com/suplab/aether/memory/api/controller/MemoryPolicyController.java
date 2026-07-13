@@ -1,6 +1,8 @@
 package com.suplab.aether.memory.api.controller;
 
 import com.suplab.aether.memory.domain.MemoryPolicy;
+import com.suplab.aether.memory.domain.PolicyChangeEntry;
+import com.suplab.aether.memory.ports.MemoryPolicyAuditStore;
 import com.suplab.aether.memory.ports.MemoryPolicyStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -10,8 +12,10 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -28,9 +32,12 @@ public class MemoryPolicyController {
     private static final Logger log = LoggerFactory.getLogger(MemoryPolicyController.class);
 
     private final MemoryPolicyStore policyStore;
+    private final MemoryPolicyAuditStore policyAuditStore;
 
-    public MemoryPolicyController(MemoryPolicyStore policyStore) {
+    public MemoryPolicyController(MemoryPolicyStore policyStore,
+                                  MemoryPolicyAuditStore policyAuditStore) {
         this.policyStore = policyStore;
+        this.policyAuditStore = policyAuditStore;
     }
 
     /**
@@ -64,12 +71,33 @@ public class MemoryPolicyController {
                     asBoolean(body.get("federationEnabled"), defaults.federationEnabled()),
                     asInt(body.get("federationMaxSummaryLength"), defaults.federationMaxSummaryLength()));
             policyStore.save(policy);
+            policyAuditStore.record(PolicyChangeEntry.of(policy));
             log.info("Replaced memory policy tenantId={} federationEnabled={}",
                     tenantId, policy.federationEnabled());
             return ResponseEntity.ok(toView(policy));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    /**
+     * Returns the recent policy-change history for a tenant (newest first) — a governance audit of
+     * how decay, retention, and federation settings evolved.
+     *
+     * @param limit maximum number of change records (default 20)
+     * @return 200 OK with the list of policy snapshots and change timestamps
+     */
+    @GetMapping("/audit")
+    public ResponseEntity<List<Map<String, Object>>> audit(@PathVariable String tenantId,
+                                                           @RequestParam(defaultValue = "20") int limit) {
+        var entries = policyAuditStore.recentFor(tenantId, limit).stream()
+                .map(entry -> {
+                    var view = new java.util.LinkedHashMap<>(toView(entry.policy()));
+                    view.put("changedAt", entry.changedAt().toString());
+                    return (Map<String, Object>) view;
+                })
+                .toList();
+        return ResponseEntity.ok(entries);
     }
 
     private static Map<String, Object> toView(MemoryPolicy policy) {

@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicLong;
  * <ul>
  *   <li>{@code aether.memory.shared.decayed} — counter, memories decayed (accumulates)</li>
  *   <li>{@code aether.memory.shared.archived} — counter, memories archived (accumulates)</li>
+ *   <li>{@code aether.memory.shared.purged} — counter, archived memories purged past retention (accumulates)</li>
  *   <li>{@code aether.memory.shared.total} — gauge, active memories after the last run</li>
  * </ul>
  */
@@ -26,6 +27,7 @@ public class MemoryLifecycleScheduler {
     private final MemoryLifecyclePort lifecyclePort;
     private final Counter decayedCounter;
     private final Counter archivedCounter;
+    private final Counter purgedCounter;
     private final AtomicLong totalActive = new AtomicLong(0);
 
     public MemoryLifecycleScheduler(MemoryLifecyclePort lifecyclePort, MeterRegistry meterRegistry) {
@@ -35,6 +37,9 @@ public class MemoryLifecycleScheduler {
                 .register(meterRegistry);
         this.archivedCounter = Counter.builder("aether.memory.shared.archived")
                 .description("Total shared memories archived across lifecycle runs")
+                .register(meterRegistry);
+        this.purgedCounter = Counter.builder("aether.memory.shared.purged")
+                .description("Total archived memories purged past their retention window")
                 .register(meterRegistry);
         meterRegistry.gauge("aether.memory.shared.total", totalActive);
     }
@@ -48,8 +53,9 @@ public class MemoryLifecycleScheduler {
         var result = lifecyclePort.runLifecycle();
         decayedCounter.increment(result.decayedCount());
         archivedCounter.increment(result.archivedCount());
+        purgedCounter.increment(result.purgedCount());
         totalActive.set(result.totalRemaining());
-        log.info("Scheduled shared-memory lifecycle run: decayed={} archived={} totalRemaining={}",
-                result.decayedCount(), result.archivedCount(), result.totalRemaining());
+        log.info("Scheduled shared-memory lifecycle run: decayed={} archived={} purged={} totalRemaining={}",
+                result.decayedCount(), result.archivedCount(), result.purgedCount(), result.totalRemaining());
     }
 }

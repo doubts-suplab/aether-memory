@@ -44,8 +44,8 @@ class PolicyAwareMemoryLifecycleServiceIT {
         Flyway.configure().dataSource(dataSource).locations("classpath:db/migration").load().migrate();
         jdbc = new NamedParameterJdbcTemplate(dataSource);
         store = new PGVectorSharedMemoryStore(jdbc);
-        // Default parameters: decay 0.1/day after 7 days, archive below 0.1.
-        service = new PolicyAwareMemoryLifecycleService(jdbc, 0.1, 7, 0.1);
+        // Default parameters: decay 0.1/day after 7 days, archive below 0.1, retain archive 90 days.
+        service = new PolicyAwareMemoryLifecycleService(jdbc, 0.1, 7, 0.1, 90);
     }
 
     @Test
@@ -97,6 +97,40 @@ class PolicyAwareMemoryLifecycleServiceIT {
 
         assertThat(result.archivedCount()).isGreaterThanOrEqualTo(1);
         assertThat(store.countByTeam(scope)).isZero();
+    }
+
+    @Test
+    void purge_removesArchivedMemoriesPastRetentionWindow() {
+        var scope = uniqueScope();
+        // A short 1-day retention for this tenant; archive row is 5 days old → purged.
+        jdbc.update("""
+                INSERT INTO memory_policies (tenant_id, retention_days)
+                VALUES (:tenantId, 1)
+                """, new MapSqlParameterSource("tenantId", scope.tenantId()));
+        insertArchived(scope, "expired", Instant.now().minus(5, ChronoUnit.DAYS));
+        insertArchived(scope, "fresh", Instant.now());
+
+        var result = service.runLifecycle();
+
+        assertThat(result.purgedCount()).isGreaterThanOrEqualTo(1);
+        assertThat(archiveCount(scope)).isEqualTo(1); // only "fresh" remains
+    }
+
+    private void insertArchived(MemoryScope scope, String content, Instant archivedAt) {
+        jdbc.update("""
+                INSERT INTO shared_memories_archive
+                    (id, tenant_id, team_id, memory_type, content, visibility, embedding, strength,
+                     access_count, contributor_count, created_at, last_accessed_at, archived_at)
+                VALUES
+                    (:id, :tenantId, :teamId, 'SEMANTIC', :content, 'PRIVATE', NULL, 0.05,
+                     0, 1, :ts, :ts, :archivedAt)
+                """, new MapSqlParameterSource()
+                .addValue("id", UUID.randomUUID())
+                .addValue("tenantId", scope.tenantId())
+                .addValue("teamId", scope.teamId())
+                .addValue("content", content)
+                .addValue("ts", java.sql.Timestamp.from(Instant.now()))
+                .addValue("archivedAt", java.sql.Timestamp.from(archivedAt)));
     }
 
     private void saveWithLastAccess(MemoryScope scope, String content, double strength, Instant lastAccess) {

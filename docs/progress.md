@@ -5,14 +5,14 @@
 
 ---
 
-**Active Phase:** Phase 3 — Governance & Policy (next)
+**Active Phase:** Phase 4 — Kubernetes + Helm (next)
 
 | Phase | Name | Status | Sessions |
 |---|---|---|---|
 | 0 | Scaffold | ✅ Complete | 1 |
 | 1 | Shared Memory Engine | ✅ Complete | 1 |
 | 2 | Federation | ✅ Complete | 1 |
-| 3 | Governance & Policy | ⏳ Planned | — |
+| 3 | Governance & Policy | ✅ Complete | 1 |
 | 4 | Kubernetes + Helm | ⏳ Planned | — |
 
 ---
@@ -129,3 +129,34 @@
 - IT (Testcontainers): `JdbcFederationAuditStoreIT` (4); `JdbcMemoryPolicyStoreIT` updated for the new column
 
 ### Files changed: ~22
+
+---
+
+## Phase 3 — Governance & Policy ✅
+
+**Commit:** `feat(memory): Phase 3 — retention purge, policy audit, GDPR erasure, bulk export`
+
+### What was done
+
+**Retention purge (lifecycle):**
+- `MemoryLifecyclePort.LifecycleResult` gained `purgedCount`; `PolicyAwareMemoryLifecycleService` adds a set-based `purge()` step — deletes archived rows past each tenant's `retentionDays` (`COALESCE` to a configurable default)
+- `MemoryLifecycleScheduler` records `aether.memory.shared.purged`; `aether.memory.lifecycle.retention-days` config
+
+**Policy change audit:**
+- `policy_change_audit` (V007) + `PolicyChangeEntry` + `MemoryPolicyAuditStore` / `JdbcMemoryPolicyAuditStore`
+- `MemoryPolicyController` records a snapshot on every `PUT` and serves `GET …/memory-policy/audit`
+
+**GDPR right-to-erasure + export:**
+- `MemoryGovernancePort` (+ nested `ErasureResult`) / `JdbcMemoryGovernanceService` — `@Transactional` erasure across `shared_memories` + `shared_memories_archive` (tenant erasure also clears `federation_audit`), with a `gdpr_erasure_audit` (V008) proof-of-erasure written in the same transaction
+- `ErasureScope`, `ErasureAuditEntry` domain types
+- `MemoryGovernanceController`: `DELETE …/teams/{teamId}` (team erase), `DELETE …/tenants/{tenantId}` (tenant erase), `GET …/teams/{teamId}/export` (portability), `GET …/erasures` (audit)
+
+**Wiring:** `MemoryApiConfig` beans (policy-audit store, governance service); lifecycle bean gains retention-days.
+
+**Tests:**
+- Unit: `GovernanceDomainTest` (4); scheduler test updated for the purge metric
+- IT (Testcontainers): `JdbcMemoryGovernanceServiceIT` (4 — team/tenant erasure, isolation, export), `JdbcMemoryPolicyAuditStoreIT` (3), lifecycle purge scenario
+
+**Migrations:** `V007__create_policy_change_audit.sql`, `V008__create_gdpr_erasure_audit.sql`
+
+### Files changed: ~20

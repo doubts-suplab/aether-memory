@@ -34,6 +34,7 @@ aether:
       decay-rate: ${MEMORY_DECAY_RATE:0.01}
       decay-after-days: ${MEMORY_DECAY_AFTER_DAYS:7}
       archive-threshold: ${MEMORY_ARCHIVE_THRESHOLD:0.1}
+      retention-days: ${MEMORY_RETENTION_DAYS:90}
       decay-cron: ${MEMORY_DECAY_CRON:0 0 3 * * *}
     federation:
       # Comma-separated base URLs of peer Memory instances; empty = local-only federation

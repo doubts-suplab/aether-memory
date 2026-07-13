@@ -6,14 +6,18 @@ import com.suplab.aether.memory.engine.federation.DefaultMemoryFederationService
 import com.suplab.aether.memory.engine.federation.FederationRateLimiter;
 import com.suplab.aether.memory.engine.federation.HttpFederationPeerClient;
 import com.suplab.aether.memory.engine.federation.JdbcFederationAuditStore;
+import com.suplab.aether.memory.engine.governance.JdbcMemoryGovernanceService;
 import com.suplab.aether.memory.engine.lifecycle.PolicyAwareMemoryLifecycleService;
+import com.suplab.aether.memory.engine.policy.JdbcMemoryPolicyAuditStore;
 import com.suplab.aether.memory.engine.policy.JdbcMemoryPolicyStore;
 import com.suplab.aether.memory.engine.store.PGVectorSharedMemoryStore;
 import com.suplab.aether.memory.ports.FederationAuditStore;
 import com.suplab.aether.memory.ports.FederationPeerClient;
 import com.suplab.aether.memory.ports.MemoryFederationGateway;
 import com.suplab.aether.memory.ports.MemoryFederationPort;
+import com.suplab.aether.memory.ports.MemoryGovernancePort;
 import com.suplab.aether.memory.ports.MemoryLifecyclePort;
+import com.suplab.aether.memory.ports.MemoryPolicyAuditStore;
 import com.suplab.aether.memory.ports.MemoryPolicyStore;
 import com.suplab.aether.memory.ports.SharedMemoryStore;
 import org.springframework.beans.factory.annotation.Value;
@@ -50,6 +54,22 @@ public class MemoryApiConfig {
     @Bean
     public MemoryPolicyStore memoryPolicyStore(NamedParameterJdbcTemplate jdbc) {
         return new JdbcMemoryPolicyStore(jdbc);
+    }
+
+    /**
+     * Creates the policy-change audit store backed by the {@code policy_change_audit} table.
+     */
+    @Bean
+    public MemoryPolicyAuditStore memoryPolicyAuditStore(NamedParameterJdbcTemplate jdbc) {
+        return new JdbcMemoryPolicyAuditStore(jdbc);
+    }
+
+    /**
+     * Creates the GDPR governance service (erasure across active + archive, export, erasure audit).
+     */
+    @Bean
+    public MemoryGovernancePort memoryGovernancePort(NamedParameterJdbcTemplate jdbc) {
+        return new JdbcMemoryGovernanceService(jdbc);
     }
 
     /**
@@ -123,9 +143,10 @@ public class MemoryApiConfig {
             NamedParameterJdbcTemplate jdbc,
             @Value("${aether.memory.lifecycle.decay-rate:0.01}") double defaultDecayRate,
             @Value("${aether.memory.lifecycle.decay-after-days:7}") int defaultDecayAfterDays,
-            @Value("${aether.memory.lifecycle.archive-threshold:0.1}") double defaultArchiveThreshold) {
+            @Value("${aether.memory.lifecycle.archive-threshold:0.1}") double defaultArchiveThreshold,
+            @Value("${aether.memory.lifecycle.retention-days:90}") int defaultRetentionDays) {
         return new PolicyAwareMemoryLifecycleService(
-                jdbc, defaultDecayRate, defaultDecayAfterDays, defaultArchiveThreshold);
+                jdbc, defaultDecayRate, defaultDecayAfterDays, defaultArchiveThreshold, defaultRetentionDays);
     }
 
     /**

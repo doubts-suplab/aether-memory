@@ -2,6 +2,13 @@
 
 > Rolling log of working sessions. Newest first.
 
+## Session 1 — Phase 3 Governance & Policy
+- Retention purge: `LifecycleResult` gained `purgedCount`; `PolicyAwareMemoryLifecycleService.purge()` deletes archived rows past per-tenant `retentionDays`; `.purged` metric; retention-days config.
+- Policy change audit: `policy_change_audit` (V007), `PolicyChangeEntry` + `MemoryPolicyAuditStore`/`JdbcMemoryPolicyAuditStore`; controller records on PUT + `GET …/memory-policy/audit`.
+- GDPR: `MemoryGovernancePort`/`JdbcMemoryGovernanceService` (@Transactional erasure across active+archive, tenant erase also clears federation_audit; `gdpr_erasure_audit` V008 proof); `ErasureScope`/`ErasureAuditEntry`; `MemoryGovernanceController` (DELETE team, DELETE tenant, GET export, GET erasures).
+- Tests: GovernanceDomainTest, JdbcMemoryGovernanceServiceIT, JdbcMemoryPolicyAuditStoreIT, lifecycle purge scenario, scheduler purge metric. 60 unit tests green; verified build before push.
+- Docs synced (roadmap/progress/README/index.html/architecture/CLAUDE).
+
 ## Session 1 — Phase 2 Federation
 - Added federation gateway (`MemoryFederationGateway`/`DefaultMemoryFederationGateway`): local search + peer fan-out, dedupe by (provenance, summary), rank by strength, clamp, audit.
 - Outbound `FederationPeerClient`/`HttpFederationPeerClient` calls peers at `…/federation/query?localOnly=true` (2s/5s timeouts, resilient to failures); controller sets `fanOut = !localOnly` to prevent recursion.

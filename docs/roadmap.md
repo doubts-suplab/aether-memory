@@ -57,16 +57,16 @@
 
 ---
 
-## Phase 3 — Governance & Policy UI
+## Phase 3 — Governance & Policy ✅
 
 **Goal:** Full per-tenant governance surface and retention enforcement.
 
 | Deliverable | Status |
 |---|---|
-| Retention-window purge of archived memories | ⏳ |
-| Policy validation + change audit | ⏳ |
-| GDPR erasure across active + archive tables | ⏳ |
-| Bulk export API | ⏳ |
+| Retention-window purge of archived memories (per-tenant, in the lifecycle) | ✅ |
+| Policy validation + change audit (`policy_change_audit` V007 + `GET …/memory-policy/audit`) | ✅ |
+| GDPR erasure across active + archive tables (transactional + `gdpr_erasure_audit` V008) | ✅ |
+| Bulk export API (`GET …/teams/{teamId}/export`) | ✅ |
 
 ---
 

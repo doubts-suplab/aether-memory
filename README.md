@@ -38,6 +38,11 @@ cd ../.. && mvn spring-boot:run -pl memory-api
 | `DELETE` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories/{memoryId}` | Delete a specific memory |
 | `POST` | `/api/v1/federation/query` | Privacy-preserving cross-instance memory query |
 | `GET`/`PUT` | `/api/v1/tenants/{tenantId}/memory-policy` | Read / replace a tenant's governance policy |
+| `GET` | `/api/v1/tenants/{tenantId}/memory-policy/audit` | Policy-change history (governance audit) |
+| `GET` | `/api/v1/tenants/{tenantId}/teams/{teamId}/export` | Bulk export a team's memories (GDPR portability) |
+| `DELETE` | `/api/v1/tenants/{tenantId}/teams/{teamId}` | Erase a team's memories (active + archive) |
+| `DELETE` | `/api/v1/tenants/{tenantId}` | Erase a whole tenant (GDPR right to erasure) |
+| `GET` | `/api/v1/tenants/{tenantId}/erasures` | Erasure audit trail |
 | `GET` | `/actuator/health` | Liveness + readiness probes |
 
 ## Memory Model
@@ -63,7 +68,11 @@ Federation is privacy-preserving by construction: only `FEDERATED` memories in *
 
 ### Shared Reinforcement & Decay
 
-Every team retrieval reinforces a memory (strength up by the tenant's configured increment); every distinct contributor raises its `contributorCount`. Idle memories decay on a schedule using **per-tenant** parameters; once below a tenant's archive threshold they are moved to an archive table — never silently deleted.
+Every team retrieval reinforces a memory (strength up by the tenant's configured increment); every distinct contributor raises its `contributorCount`. Idle memories decay on a schedule using **per-tenant** parameters; once below a tenant's archive threshold they are moved to an archive table — never silently deleted — and finally purged once past the tenant's **retention window**.
+
+### Governance & GDPR
+
+Each policy change is snapshotted to an audit trail. Right-to-erasure is transactional across the active and archive tables (a tenant erase also clears its federation-audit trail), and every erasure writes an immutable proof-of-erasure record. A team's memories can be bulk-exported for data portability.
 
 ## Ecosystem
 
@@ -92,6 +101,7 @@ Aether Memory owns the **Shared Memory** capability exclusively. Personal memory
 | `MEMORY_DECAY_ENABLED` | `true` | Toggle the scheduled decay/archive lifecycle |
 | `MEMORY_DECAY_RATE` | `0.01` | Default strength lost per idle day (tenants may override) |
 | `MEMORY_ARCHIVE_THRESHOLD` | `0.1` | Default archive cutoff strength (tenants may override) |
+| `MEMORY_RETENTION_DAYS` | `90` | Default archive retention window before purge (tenants may override) |
 | `FEDERATION_PEERS` | _(empty)_ | Comma-separated peer Memory base URLs for fan-out (empty = local-only) |
 | `FEDERATION_RATE_CAPACITY` | `60` | Max federation queries per origin tenant per window |
 | `FEDERATION_RATE_WINDOW_MILLIS` | `60000` | Rate-limit window length (ms) |

@@ -65,7 +65,9 @@ FederatedMemory    = (type, summary≤280, strength, provenance)   — privacy-p
 | `MemoryFederationGateway` | `DefaultMemoryFederationGateway` | Orchestrates local search + peer fan-out, dedupe/rank, audit |
 | `FederationPeerClient` | `HttpFederationPeerClient` | Outbound query to peer instances (`?localOnly=true`, resilient) |
 | `FederationAuditStore` | `JdbcFederationAuditStore` | Persist per-query audit records |
-| `MemoryLifecyclePort` | `PolicyAwareMemoryLifecycleService` | Per-tenant decay + archive |
+| `MemoryLifecyclePort` | `PolicyAwareMemoryLifecycleService` | Per-tenant decay + archive + retention purge |
+| `MemoryPolicyAuditStore` | `JdbcMemoryPolicyAuditStore` | Policy-change snapshots (governance audit) |
+| `MemoryGovernancePort` | `JdbcMemoryGovernanceService` | Transactional GDPR erasure (active + archive), export, erasure audit |
 
 ---
 
@@ -79,6 +81,8 @@ FederatedMemory    = (type, summary≤280, strength, provenance)   — privacy-p
 | `V004` | `shared_memories_archive` | Faded memories moved here (keeps embedding for restore) |
 | `V005` | `federation_audit` | One row per federation query (origin, query, count, localOnly) |
 | `V006` | `memory_policies.federation_max_summary_length` | Per-tenant redaction depth (1..280) |
+| `V007` | `policy_change_audit` | Full policy snapshot per change (governance audit) |
+| `V008` | `gdpr_erasure_audit` | Proof-of-erasure per GDPR request (team/tenant scope) |
 
 All embeddings are 384-dim (all-MiniLM-L6-v2), consistent across the ecosystem.
 
@@ -103,7 +107,13 @@ All embeddings are 384-dim (all-MiniLM-L6-v2), consistent across the ecosystem.
 1. Scheduler (`@Scheduled`, default 03:00) → `MemoryLifecyclePort.runLifecycle`.
 2. **Decay**: single UPDATE, `LEFT JOIN memory_policies` with `COALESCE` to defaults, `strength -= decayRate × days_idle` beyond the grace period.
 3. **Archive**: data-modifying CTE (`DELETE … RETURNING … INSERT`) moves sub-threshold rows atomically into `shared_memories_archive`.
-4. Micrometer: `aether.memory.shared.decayed` / `.archived` counters, `.total` gauge.
+4. **Purge**: archived rows older than each tenant's `retentionDays` (COALESCE to default) are permanently deleted.
+5. Micrometer: `aether.memory.shared.decayed` / `.archived` / `.purged` counters, `.total` gauge.
+
+### 5.4 GDPR governance
+- **Erasure** (`JdbcMemoryGovernanceService`, `@Transactional`): `DELETE …/teams/{teamId}` removes a team's active + archived memories; `DELETE …/tenants/{tenantId}` removes every team plus the tenant's `federation_audit`. A `gdpr_erasure_audit` proof row is written in the same transaction.
+- **Export** (`GET …/teams/{teamId}/export`): returns a team's active memories for data portability.
+- **Policy audit**: each `PUT …/memory-policy` snapshots the new policy to `policy_change_audit`, served by `GET …/memory-policy/audit`.
 
 ---
 
