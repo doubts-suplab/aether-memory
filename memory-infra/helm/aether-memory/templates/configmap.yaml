@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "aether-memory.fullname" . }}-config
+  labels:
+    {{- include "aether-memory.labels" . | nindent 4 }}
+data:
+  ollama-base-url: {{ .Values.config.ollamaBaseUrl | quote }}
+  embedding-enabled: {{ .Values.config.embeddingEnabled | quote }}
+  embedding-model: {{ .Values.config.embeddingModel | quote }}
+  memory-decay-enabled: {{ .Values.config.lifecycle.decayEnabled | quote }}
+  memory-decay-rate: {{ .Values.config.lifecycle.decayRate | quote }}
+  memory-decay-after-days: {{ .Values.config.lifecycle.decayAfterDays | quote }}
+  memory-archive-threshold: {{ .Values.config.lifecycle.archiveThreshold | quote }}
+  memory-retention-days: {{ .Values.config.lifecycle.retentionDays | quote }}
+  memory-decay-cron: {{ .Values.config.lifecycle.decayCron | quote }}
+  federation-peers: {{ .Values.config.federation.peers | quote }}
+  federation-rate-capacity: {{ .Values.config.federation.rateCapacity | quote }}
+  federation-rate-window-millis: {{ .Values.config.federation.rateWindowMillis | quote }}

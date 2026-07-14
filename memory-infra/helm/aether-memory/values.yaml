@@ -1,0 +1,101 @@
+# Default values for aether-memory.
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/suplab/aether-memory
+  tag: ""          # defaults to .Chart.AppVersion when empty
+  pullPolicy: IfNotPresent
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  # ServiceAccount token is never mounted — the app calls no Kubernetes API.
+  automountServiceAccountToken: false
+
+service:
+  type: ClusterIP
+  port: 8083
+
+# Non-secret application configuration → rendered into a ConfigMap.
+config:
+  ollamaBaseUrl: "http://ollama:11434"
+  embeddingEnabled: "true"
+  embeddingModel: "all-minilm"
+  lifecycle:
+    decayEnabled: "true"
+    decayRate: "0.01"
+    decayAfterDays: "7"
+    archiveThreshold: "0.1"
+    retentionDays: "90"
+    decayCron: "0 0 3 * * *"
+  federation:
+    peers: ""                 # comma-separated peer base URLs; empty = local-only
+    rateCapacity: "60"
+    rateWindowMillis: "60000"
+
+# Database credentials come from an existing Secret — never templated into the chart.
+# Create it out-of-band, e.g.:
+#   kubectl create secret generic aether-memory-secrets \
+#     --from-literal=postgres-url=jdbc:postgresql://... \
+#     --from-literal=postgres-user=aether \
+#     --from-literal=postgres-password=<secret>
+database:
+  existingSecret: aether-memory-secrets
+  urlKey: postgres-url
+  userKey: postgres-user
+  passwordKey: postgres-password
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 8
+  targetCPUUtilizationPercentage: 70
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+
+# Pod-level security context (non-root).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# Container-level security context (hardened).
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+probes:
+  startup:
+    failureThreshold: 30
+    periodSeconds: 10
+  liveness:
+    initialDelaySeconds: 30
+    periodSeconds: 30
+    failureThreshold: 3
+  readiness:
+    initialDelaySeconds: 20
+    periodSeconds: 10
+    failureThreshold: 3
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/path: "/actuator/prometheus"
+  prometheus.io/port: "8083"
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

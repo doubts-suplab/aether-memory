@@ -5,7 +5,7 @@
 
 ---
 
-**Active Phase:** Phase 4 — Kubernetes + Helm (next)
+**Active Phase:** All planned phases (0–4) complete.
 
 | Phase | Name | Status | Sessions |
 |---|---|---|---|
@@ -13,7 +13,7 @@
 | 1 | Shared Memory Engine | ✅ Complete | 1 |
 | 2 | Federation | ✅ Complete | 1 |
 | 3 | Governance & Policy | ✅ Complete | 1 |
-| 4 | Kubernetes + Helm | ⏳ Planned | — |
+| 4 | Kubernetes + Helm | ✅ Complete | 1 |
 
 ---
 
@@ -160,3 +160,24 @@
 **Migrations:** `V007__create_policy_change_audit.sql`, `V008__create_gdpr_erasure_audit.sql`
 
 ### Files changed: ~20
+
+---
+
+## Phase 4 — Kubernetes + Helm ✅
+
+**Commit:** `feat(memory): Phase 4 — Helm chart and OCI release workflow`
+
+### What was done
+
+**Helm chart (`memory-infra/helm/aether-memory/`):**
+- `Chart.yaml` (apiVersion v2, appVersion 0.1.0, kubeVersion ≥1.25), `values.yaml`, `.helmignore`
+- `templates/`: `_helpers.tpl` (name/fullname/labels/image), `deployment.yaml`, `service.yaml`, `hpa.yaml`, `configmap.yaml`, `serviceaccount.yaml`, `NOTES.txt`
+- Non-secret config → ConfigMap → env; DB credentials from an **existing Secret** (never templated into the chart)
+- Hardened: non-root (uid 1000), read-only root filesystem, all capabilities dropped, SA token not mounted, startup/liveness/readiness probes, resource requests/limits
+- Autoscaling (HPA) toggle; replicas fixed only when autoscaling is disabled
+- Prometheus scrape annotations on `/actuator/prometheus`
+
+**CI/CD:**
+- `.github/workflows/helm-release.yml` — `helm lint` + `helm template` sanity on chart PRs; on `v*` tags, package and `helm push` to `oci://ghcr.io/suplab/charts`
+
+### Files changed: ~12

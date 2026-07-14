@@ -74,6 +74,22 @@ Every team retrieval reinforces a memory (strength up by the tenant's configured
 
 Each policy change is snapshotted to an audit trail. Right-to-erasure is transactional across the active and archive tables (a tenant erase also clears its federation-audit trail), and every erasure writes an immutable proof-of-erasure record. A team's memories can be bulk-exported for data portability.
 
+## Deployment
+
+Local: `memory-infra/docker/docker-compose.yml`. Kubernetes: raw manifests in `memory-infra/k8s/`, or the Helm chart:
+
+```bash
+# DB credentials come from an existing Secret (never templated into the chart)
+kubectl create secret generic aether-memory-secrets \
+  --from-literal=postgres-url=jdbc:postgresql://<host>:5432/aether_memory \
+  --from-literal=postgres-user=aether \
+  --from-literal=postgres-password=<password>
+
+helm install aether-memory memory-infra/helm/aether-memory
+```
+
+The chart runs non-root with a read-only root filesystem, drops all capabilities, ships startup/liveness/readiness probes, and enables an HPA (2–8 replicas). Tagging `v*` publishes the chart to `oci://ghcr.io/suplab/charts` via GitHub Actions.
+
 ## Ecosystem
 
 ```

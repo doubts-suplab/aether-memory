@@ -70,13 +70,14 @@
 
 ---
 
-## Phase 4 — Kubernetes + Helm
+## Phase 4 — Kubernetes + Helm ✅
 
 **Goal:** Production-ready deployment.
 
 | Deliverable | Status |
 |---|---|
-| Multi-stage Dockerfile (Temurin 21 JRE, non-root uid 1000) | ✅ (scaffolded) |
-| Helm chart `memory-infra/helm/aether-memory/` | ⏳ |
-| HPA (min 2, max 8 replicas) | ✅ (manifest) |
-| Docker build + Helm release workflows | ⏳ |
+| Multi-stage Dockerfile (Temurin 21 JRE, non-root uid 1000) | ✅ |
+| Helm chart `memory-infra/helm/aether-memory/` (templated deploy/svc/hpa/config/sa) | ✅ |
+| HPA (min 2, max 8 replicas) — chart + raw manifest | ✅ |
+| Docker build + Helm release (OCI → GHCR) workflows | ✅ |
+| Hardened pod (non-root, read-only rootfs, dropped caps, SA token off) | ✅ |

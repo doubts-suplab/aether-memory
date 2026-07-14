@@ -1,0 +1,17 @@
+apiVersion: v2
+name: aether-memory
+description: Aether Memory — shared team and organisational memory platform (port 8083)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+kubeVersion: ">=1.25.0-0"
+home: https://github.com/suplab/aether-memory
+sources:
+  - https://github.com/suplab/aether-memory
+keywords:
+  - aether
+  - memory
+  - pgvector
+  - federation
+maintainers:
+  - name: suplab

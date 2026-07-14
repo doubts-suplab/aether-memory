@@ -19,7 +19,7 @@
 
 **Capability owned (exclusively):** *Shared Memory* — Team Memory, Shared Reinforcement, Memory Federation API, Configurable Policies. Personal memory remains owned by Aether Core; Memory does not duplicate it.
 
-**Current status:** Phases 0–3 complete (Scaffold, Shared Memory Engine, Federation, Governance & Policy). Next: Phase 4 — Kubernetes + Helm.
+**Current status:** Phases 0–4 complete (Scaffold, Shared Memory Engine, Federation, Governance & Policy, Kubernetes + Helm). The planned roadmap is fully delivered.
 
 **One runnable application:**
 - `memory-api` — Shared Memory Platform API (port 8083)

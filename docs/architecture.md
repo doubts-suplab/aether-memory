@@ -131,6 +131,12 @@ Reads from environment variables (never hardcoded). Defaults target local Docker
 
 ---
 
-## 8. Standalone Guarantee
+## 8. Deployment
+
+- **Local:** Docker Compose (`memory-infra/docker`) — pgvector + the app.
+- **Kubernetes:** raw manifests (`memory-infra/k8s`) or the Helm chart (`memory-infra/helm/aether-memory`). The chart renders deployment, service, HPA, ConfigMap, and ServiceAccount; DB credentials are read from an **existing Secret** and never templated in. Pods run non-root (uid 1000), read-only root filesystem, all capabilities dropped, SA token unmounted, with startup/liveness/readiness probes and CPU-based autoscaling (2–8 replicas).
+- **Release:** `Docker Build & Push` builds a multi-arch image to GHCR; `Helm Release` lints/templates on chart PRs and, on `v*` tags, packages and pushes the chart to `oci://ghcr.io/suplab/charts`.
+
+## 9. Standalone Guarantee
 
 Aether Memory has no compile-time or runtime dependency on Core or Grid. It boots, migrates, serves, and runs its lifecycle entirely on its own PostgreSQL schema (`aether_memory`).

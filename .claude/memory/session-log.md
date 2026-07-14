@@ -2,6 +2,12 @@
 
 > Rolling log of working sessions. Newest first.
 
+## Session 1 — Phase 4 Kubernetes + Helm
+- Authored the Helm chart `memory-infra/helm/aether-memory` (Chart/values/.helmignore + templates: _helpers, deployment, service, hpa, configmap, serviceaccount, NOTES).
+- Config → ConfigMap → env; DB creds from an existing Secret (never templated). Hardened pod (non-root, read-only rootfs, dropped caps, SA token off), probes, resources, HPA toggle, Prometheus annotations.
+- Added `.github/workflows/helm-release.yml` — lint + template on chart PRs; package + `helm push` OCI to GHCR on `v*` tags.
+- Docs synced (roadmap/progress/README/index.html/architecture/CLAUDE). All planned phases 0–4 complete.
+
 ## Session 1 — Phase 3 Governance & Policy
 - Retention purge: `LifecycleResult` gained `purgedCount`; `PolicyAwareMemoryLifecycleService.purge()` deletes archived rows past per-tenant `retentionDays`; `.purged` metric; retention-days config.
 - Policy change audit: `policy_change_audit` (V007), `PolicyChangeEntry` + `MemoryPolicyAuditStore`/`JdbcMemoryPolicyAuditStore`; controller records on PUT + `GET …/memory-policy/audit`.

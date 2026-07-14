@@ -1,0 +1,30 @@
+Aether Memory has been deployed.
+
+Release:   {{ .Release.Name }}
+Namespace: {{ .Release.Namespace }}
+Image:     {{ include "aether-memory.image" . }}
+
+1. Confirm the database secret exists (the chart never templates credentials):
+
+     kubectl -n {{ .Release.Namespace }} get secret {{ .Values.database.existingSecret }}
+
+   If missing, create it:
+
+     kubectl -n {{ .Release.Namespace }} create secret generic {{ .Values.database.existingSecret }} \
+       --from-literal={{ .Values.database.urlKey }}=jdbc:postgresql://<host>:5432/aether_memory \
+       --from-literal={{ .Values.database.userKey }}=aether \
+       --from-literal={{ .Values.database.passwordKey }}=<password>
+
+2. Check rollout status:
+
+     kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "aether-memory.fullname" . }}
+
+3. Port-forward and hit the health endpoint:
+
+     kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "aether-memory.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+     curl http://localhost:{{ .Values.service.port }}/actuator/health
+
+{{- if .Values.autoscaling.enabled }}
+
+Autoscaling is enabled ({{ .Values.autoscaling.minReplicas }}–{{ .Values.autoscaling.maxReplicas }} replicas, target {{ .Values.autoscaling.targetCPUUtilizationPercentage }}% CPU).
+{{- end }}

@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "aether-memory.fullname" . }}
+  labels:
+    {{- include "aether-memory.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "aether-memory.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "aether-memory.selectorLabels" . | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "aether-memory.serviceAccountName" . }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountServiceAccountToken }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: {{ include "aether-memory.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          env:
+            - name: SERVER_PORT
+              value: {{ .Values.service.port | quote }}
+            - name: POSTGRES_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.existingSecret }}
+                  key: {{ .Values.database.urlKey }}
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.existingSecret }}
+                  key: {{ .Values.database.userKey }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.existingSecret }}
+                  key: {{ .Values.database.passwordKey }}
+            {{- $cm := printf "%s-config" (include "aether-memory.fullname" .) }}
+            - name: OLLAMA_BASE_URL
+              valueFrom: { configMapKeyRef: { name: {{ $cm }}, key: ollama-base-url } }
+            - name: EMBEDDING_ENABLED
+              valueFrom: { configMapKeyRef: { name: {{ $cm }}, key: embedding-enabled } }
+            - name: EMBEDDING_MODEL
+              valueFrom: { configMapKeyRef: { name: {{ $cm }}, key: embedding-model } }
+            - name: MEMORY_DECAY_ENABLED
+              valueFrom: { configMapKeyRef: { name: {{ $cm }}, key: memory-decay-enabled } }
+            - name: MEMORY_DECAY_RATE
+              valueFrom: { configMapKeyRef: { name: {{ $cm }}, key: memory-decay-rate } }
+            - name: MEMORY_DECAY_AFTER_DAYS
+              valueFrom: { configMapKeyRef: { name: {{ $cm }}, key: memory-decay-after-days } }
+            - name: MEMORY_ARCHIVE_THRESHOLD
+              valueFrom: { configMapKeyRef: { name: {{ $cm }}, key: memory-archive-threshold } }
+            - name: MEMORY_RETENTION_DAYS
+              valueFrom: { configMapKeyRef: { name: {{ $cm }}, key: memory-retention-days } }
+            - name: MEMORY_DECAY_CRON
+              valueFrom: { configMapKeyRef: { name: {{ $cm }}, key: memory-decay-cron } }
+            - name: FEDERATION_PEERS
+              valueFrom: { configMapKeyRef: { name: {{ $cm }}, key: federation-peers } }
+            - name: FEDERATION_RATE_CAPACITY
+              valueFrom: { configMapKeyRef: { name: {{ $cm }}, key: federation-rate-capacity } }
+            - name: FEDERATION_RATE_WINDOW_MILLIS
+              valueFrom: { configMapKeyRef: { name: {{ $cm }}, key: federation-rate-window-millis } }
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+            failureThreshold: {{ .Values.probes.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+            failureThreshold: {{ .Values.probes.readiness.failureThreshold }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
