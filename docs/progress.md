@@ -5,12 +5,12 @@
 
 ---
 
-**Active Phase:** Phase 0 — Scaffold ✅ (complete)
+**Active Phase:** Phase 1 — Shared Memory Engine ✅ (complete) · next: Phase 2 — Federation
 
 | Phase | Name | Status | Sessions |
 |---|---|---|---|
 | 0 | Scaffold | ✅ Complete | 1 |
-| 1 | Shared Memory Engine | ⏳ Planned | — |
+| 1 | Shared Memory Engine | ✅ Complete | 2 |
 | 2 | Federation | ⏳ Planned | — |
 | 3 | Governance & Policy | ⏳ Planned | — |
 | 4 | Kubernetes + Helm | ⏳ Planned | — |
@@ -70,3 +70,47 @@
 **Docs:**
 - `README.md`, `docs/index.html`, `docs/architecture.md`, `docs/roadmap.md`, `docs/progress.md`
 - GitHub Actions: `ci.yml`, `quality-gate.yml`, `docker-build.yml`
+
+---
+
+## Phase 1 — Shared Memory Engine ✅ (session 2)
+
+**Commit:** `feat(memory): wire semantic search + contributor API, run Testcontainers ITs in CI`
+
+Phase 0 built the engine; Phase 1 makes it reachable and exercisable end-to-end. The pgvector
+`findSimilar` read path and the shared-reinforcement `contribute()` signal existed in the store/domain
+but had no REST entry point, and the Testcontainers ITs never ran.
+
+### What was done
+
+**Semantic retrieval endpoint** (the core read path):
+- `SharedMemoryController` gains `POST …/memories/search` — body `{"query": "...", "limit": N}`. Embeds
+  the query via the optional `SharedEmbeddingService` (zero-vector fallback when embedding is off),
+  runs collection-scoped `findSimilar`, reinforces each hit by the **tenant policy** increment, returns
+  the existing view projection. This wires deliverables 1 and 4 (policy-sourced reinforcement) together.
+
+**Contributor API** (shared reinforcement):
+- `SharedMemoryStore.contribute(memoryId, scope, increment)` (domain port) →
+  `PGVectorSharedMemoryStore` scoped `UPDATE … contributor_count + 1, strength = LEAST(1.0, …),
+  last_accessed_at = NOW() … RETURNING …` (explicit columns, named params). Reuses the domain's
+  existing `SharedMemory.contribute()` semantics (bumps contributorCount, not accessCount).
+- `SharedMemoryController` gains `POST …/memories/{memoryId}/contribute` (200 with the updated view;
+  404 if not found in scope), increment sourced from tenant policy.
+
+**Testcontainers green in CI:**
+- `maven-failsafe-plugin` wired in the parent (pluginManagement) and activated in `memory-engine`, so
+  `PGVectorSharedMemoryStoreIT`, `JdbcMemoryPolicyStoreIT`, and `PolicyAwareMemoryLifecycleServiceIT`
+  now run in the `verify` phase. Previously no failsafe plugin existed, so surefire never ran `*IT` and
+  the ITs did not execute in CI at all.
+
+No new Flyway migration was required — `contributor_count` and the IVFFlat vector index already exist.
+
+**Tests — 53 unit tests green (was ~45):**
+- `SharedMemoryControllerTest` (10, fake ports) — store / listByType / search / contribute / count /
+  delete, incl. policy-sourced increment and 400/404 paths
+- `PGVectorSharedMemoryStoreIT` gains `contribute` cases (increment + scope isolation)
+- `mvn -DskipITs verify` passes the JaCoCo 80% line gate; the ITs run under failsafe in CI
+
+### Not yet done (later phases)
+- Distinct-contributor dedup (identity tracking) — a future refinement; Phase 1 records a contribution
+  as the domain models it (increment). Federation hardening = Phase 2; retention/GDPR = Phase 3.

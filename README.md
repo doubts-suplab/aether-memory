@@ -31,7 +31,9 @@ cd ../.. && mvn spring-boot:run -pl memory-api
 | Method | Path | Description |
 |---|---|---|
 | `POST` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories` | Store a new shared memory |
+| `POST` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories/search` | Semantic retrieval (body `{"query","limit"}`; reinforces on read) |
 | `GET` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories?type=SEMANTIC` | Retrieve by type (reinforces on read) |
+| `POST` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories/{memoryId}/contribute` | Record a distinct additional contributor (shared reinforcement) |
 | `GET` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories/count` | Active memory count for a team |
 | `DELETE` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories/{memoryId}` | Delete a specific memory |
 | `POST` | `/api/v1/federation/query` | Privacy-preserving cross-instance memory query |
@@ -61,7 +63,7 @@ Federation is privacy-preserving by construction: only `FEDERATED` memories in *
 
 ### Shared Reinforcement & Decay
 
-Every team retrieval reinforces a memory (strength up by the tenant's configured increment); every distinct contributor raises its `contributorCount`. Idle memories decay on a schedule using **per-tenant** parameters; once below a tenant's archive threshold they are moved to an archive table — never silently deleted.
+Every team retrieval reinforces a memory (strength up by the tenant's configured increment) — via both `GET …/memories?type=` and the semantic `POST …/memories/search`. Every distinct contributor raises its `contributorCount` through `POST …/memories/{id}/contribute`. Idle memories decay on a schedule using **per-tenant** parameters; once below a tenant's archive threshold they are moved to an archive table — never silently deleted.
 
 ## Ecosystem
 

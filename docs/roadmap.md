@@ -29,16 +29,16 @@
 
 ---
 
-## Phase 1 — Shared Memory Engine
+## Phase 1 — Shared Memory Engine ✅
 
 **Goal:** Team memory fully operational with semantic retrieval, shared reinforcement, and contributor tracking under integration tests.
 
 | Deliverable | Status |
 |---|---|
-| Semantic `findSimilar` retrieval endpoint | ⏳ |
-| `contribute()` API — record additional contributors | ⏳ |
-| Testcontainers coverage green in CI (store, policy, lifecycle) | ⏳ |
-| Reinforcement increment sourced from tenant policy end-to-end | ⏳ |
+| Semantic `findSimilar` retrieval endpoint (`POST …/memories/search`) | ✅ |
+| `contribute()` API — record additional contributors (`POST …/memories/{id}/contribute`) | ✅ |
+| Testcontainers coverage wired into CI via `maven-failsafe-plugin` (store, policy, lifecycle ITs run at `verify`) | ✅ |
+| Reinforcement increment sourced from tenant policy end-to-end (search + contribute) | ✅ |
 
 ---
 

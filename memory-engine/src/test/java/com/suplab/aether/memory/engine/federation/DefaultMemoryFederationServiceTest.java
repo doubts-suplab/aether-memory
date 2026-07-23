@@ -53,6 +53,11 @@ class DefaultMemoryFederationServiceTest {
         }
 
         @Override
+        public Optional<SharedMemory> contribute(UUID memoryId, MemoryScope scope, double increment) {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public void delete(UUID memoryId, MemoryScope scope) {
             throw new UnsupportedOperationException();
         }

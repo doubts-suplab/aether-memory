@@ -103,8 +103,8 @@
   <h1>Aether <span>Memory</span></h1>
   <p class="hero-sub">Shared team and organisational memory — collective cognition, per-tenant governance, and privacy-preserving federation across instances.</p>
   <div class="badges">
-    <span class="badge green">Phase 0 — Scaffold</span>
-    <span class="badge accent">Next: Phase 1 — Shared Memory Engine</span>
+    <span class="badge green">Phase 1 — Shared Memory Engine ✅</span>
+    <span class="badge accent">Next: Phase 2 — Federation</span>
     <span class="badge">Java 21</span>
     <span class="badge">Spring Boot 3.3</span>
     <span class="badge">pgvector</span>
@@ -206,7 +206,9 @@
       <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
       <tbody>
         <tr><td><span class="method post">POST</span></td><td><code>/api/v1/tenants/{t}/teams/{team}/memories</code></td><td>Store a shared memory</td></tr>
+        <tr><td><span class="method post">POST</span></td><td><code>/api/v1/tenants/{t}/teams/{team}/memories/search</code></td><td>Semantic retrieval (reinforces on read)</td></tr>
         <tr><td><span class="method get">GET</span></td><td><code>/api/v1/tenants/{t}/teams/{team}/memories?type=</code></td><td>Retrieve by type (reinforces on read)</td></tr>
+        <tr><td><span class="method post">POST</span></td><td><code>/api/v1/tenants/{t}/teams/{team}/memories/{id}/contribute</code></td><td>Record a distinct contributor (shared reinforcement)</td></tr>
         <tr><td><span class="method get">GET</span></td><td><code>/api/v1/tenants/{t}/teams/{team}/memories/count</code></td><td>Active memory count</td></tr>
         <tr><td><span class="method delete">DEL</span></td><td><code>/api/v1/tenants/{t}/teams/{team}/memories/{id}</code></td><td>Delete a memory</td></tr>
         <tr><td><span class="method post">POST</span></td><td><code>/api/v1/federation/query</code></td><td>Privacy-preserving cross-instance query</td></tr>
@@ -223,7 +225,7 @@
   <h2>Roadmap</h2>
   <div class="roadmap">
     <div class="roadmap-item"><span class="dot done"></span><span class="phase-label">P0</span><span class="phase-name">Scaffold</span><span class="status-badge done">Complete</span></div>
-    <div class="roadmap-item"><span class="dot planned"></span><span class="phase-label">P1</span><span class="phase-name">Shared Memory Engine</span><span class="status-badge planned">Planned</span></div>
+    <div class="roadmap-item"><span class="dot done"></span><span class="phase-label">P1</span><span class="phase-name">Shared Memory Engine</span><span class="status-badge done">Complete</span></div>
     <div class="roadmap-item"><span class="dot planned"></span><span class="phase-label">P2</span><span class="phase-name">Federation</span><span class="status-badge planned">Planned</span></div>
     <div class="roadmap-item"><span class="dot planned"></span><span class="phase-label">P3</span><span class="phase-name">Governance &amp; Policy</span><span class="status-badge planned">Planned</span></div>
     <div class="roadmap-item"><span class="dot planned"></span><span class="phase-label">P4</span><span class="phase-name">Kubernetes + Helm</span><span class="status-badge planned">Planned</span></div>
