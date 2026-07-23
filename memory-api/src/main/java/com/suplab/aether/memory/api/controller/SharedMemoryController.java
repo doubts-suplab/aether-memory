@@ -134,6 +134,60 @@ public class SharedMemoryController {
     }
 
     /**
+     * Semantic retrieval: returns the memories most similar to a query, reinforced on read.
+     *
+     * <p>Request body: {@code {"query": "...", "limit": 10}}. The query is embedded via Ollama
+     * (zero-vector fallback when embedding is disabled), vector-searched within the team's scope, and
+     * each returned memory is reinforced by the tenant's configured increment — so retrieval both
+     * answers and strengthens (shared reinforcement, sourced from tenant policy end-to-end).</p>
+     *
+     * @return 200 OK with the ordered list of memories (nearest first); 400 when query is blank
+     */
+    @PostMapping("/search")
+    public ResponseEntity<Object> search(
+            @PathVariable String tenantId,
+            @PathVariable String teamId,
+            @RequestBody Map<String, Object> body) {
+
+        var query = body.get("query");
+        if (!(query instanceof String q) || q.isBlank()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "query is required"));
+        }
+        int limit = body.get("limit") instanceof Number n ? n.intValue() : 10;
+
+        var scope = new MemoryScope(tenantId, teamId);
+        var embedding = embeddingService.map(svc -> svc.embed(q)).orElseGet(() -> new float[EMBEDDING_DIM]);
+        var increment = policyStore.resolve(tenantId).reinforcementIncrement();
+        var memories = memoryStore.findSimilar(scope, embedding, limit, increment);
+
+        log.info("Searched shared memories tenantId={} teamId={} limit={} results={} embeddingEnabled={}",
+                tenantId, teamId, limit, memories.size(), embeddingService.isPresent());
+        return ResponseEntity.ok(memories.stream().map(SharedMemoryController::toView).toList());
+    }
+
+    /**
+     * Records a distinct additional contributor re-asserting a memory (shared reinforcement):
+     * {@code contributorCount} is incremented and strength raised by the tenant's increment.
+     *
+     * @return 200 OK with the updated memory view; 404 if the memory is not found in this scope
+     */
+    @PostMapping("/{memoryId}/contribute")
+    public ResponseEntity<Object> contribute(@PathVariable String tenantId,
+                                             @PathVariable String teamId,
+                                             @PathVariable UUID memoryId) {
+        var scope = new MemoryScope(tenantId, teamId);
+        var increment = policyStore.resolve(tenantId).reinforcementIncrement();
+        return memoryStore.contribute(memoryId, scope, increment)
+                .<ResponseEntity<Object>>map(m -> {
+                    log.info("Contributor added to shared memory memoryId={} tenantId={} teamId={} contributorCount={}",
+                            memoryId, tenantId, teamId, m.contributorCount());
+                    return ResponseEntity.ok(toView(m));
+                })
+                .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "memory not found")));
+    }
+
+    /**
      * Returns the total count of active memories for the team.
      *
      * @return 200 OK with {@code tenantId}, {@code teamId}, {@code count}

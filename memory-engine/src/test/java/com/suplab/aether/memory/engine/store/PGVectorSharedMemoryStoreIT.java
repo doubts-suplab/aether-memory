@@ -155,6 +155,35 @@ class PGVectorSharedMemoryStoreIT {
     }
 
     @Test
+    void contribute_incrementsContributorCountAndReinforces() {
+        var scope = uniqueScope();
+        var memory = new SharedMemory(UUID.randomUUID(), scope.tenantId(), scope.teamId(),
+                MemoryType.SEMANTIC, "shared decision", MemoryVisibility.TENANT, 0.5, 2, 1,
+                java.time.Instant.now(), java.time.Instant.now());
+        store.save(memory, new float[384]);
+
+        var updated = store.contribute(memory.id(), scope, INCREMENT);
+
+        assertThat(updated).isPresent();
+        assertThat(updated.get().contributorCount()).isEqualTo(2);
+        assertThat(updated.get().strength()).isCloseTo(0.6, within(0.001));
+        assertThat(updated.get().accessCount()).isEqualTo(2); // contribute does not bump accessCount
+    }
+
+    @Test
+    void contribute_returnsEmptyForOtherTeam() {
+        var teamA = uniqueScope();
+        var teamB = new MemoryScope(teamA.tenantId(), teamA.teamId() + "-b");
+        var memoryA = SharedMemory.create(teamA, MemoryType.SEMANTIC, "team A memory", MemoryVisibility.PRIVATE);
+        store.save(memoryA, new float[384]);
+
+        assertThat(store.contribute(memoryA.id(), teamB, INCREMENT)).isEmpty();
+        // untouched under its real scope
+        assertThat(store.findByType(teamA, MemoryType.SEMANTIC, 10, 0.0).getFirst().contributorCount())
+                .isEqualTo(1);
+    }
+
+    @Test
     void save_upsertUpdatesExistingRecord() {
         var scope = uniqueScope();
         var memory = SharedMemory.create(scope, MemoryType.SEMANTIC, "original", MemoryVisibility.PRIVATE);
