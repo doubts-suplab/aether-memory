@@ -61,7 +61,8 @@ public class MemoryPolicyController {
                     asDouble(body.get("reinforcementIncrement"), defaults.reinforcementIncrement()),
                     asDouble(body.get("archiveThreshold"), defaults.archiveThreshold()),
                     asInt(body.get("retentionDays"), defaults.retentionDays()),
-                    asBoolean(body.get("federationEnabled"), defaults.federationEnabled()));
+                    asBoolean(body.get("federationEnabled"), defaults.federationEnabled()),
+                    asInt(body.get("federationSummaryChars"), defaults.federationSummaryChars()));
             policyStore.save(policy);
             log.info("Replaced memory policy tenantId={} federationEnabled={}",
                     tenantId, policy.federationEnabled());
@@ -79,7 +80,8 @@ public class MemoryPolicyController {
                 "reinforcementIncrement", policy.reinforcementIncrement(),
                 "archiveThreshold", policy.archiveThreshold(),
                 "retentionDays", policy.retentionDays(),
-                "federationEnabled", policy.federationEnabled());
+                "federationEnabled", policy.federationEnabled(),
+                "federationSummaryChars", policy.federationSummaryChars());
     }
 
     private static double asDouble(Object value, double defaultValue) {

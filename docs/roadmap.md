@@ -42,16 +42,18 @@
 
 ---
 
-## Phase 2 — Federation
+## Phase 2 — Federation 🔄 (core complete)
 
 **Goal:** Cross-instance federation hardened — outbound federation adapter, rate limiting, and audit.
 
 | Deliverable | Status |
 |---|---|
-| Outbound federation client (query remote Memory instances) | ⏳ |
-| Federation audit log (who queried what, when) | ⏳ |
-| Per-origin rate limiting on `/federation/query` | ⏳ |
-| Configurable redaction depth per tenant | ⏳ |
+| Outbound federation client (`FederationPeerClient` → configured peers; `includePeers` fan-out) | ✅ |
+| Federation audit log (append-only `federation_audit`, `GET /federation/audit`) | ✅ |
+| Per-origin rate limiting on `/federation/query` (429 + `Retry-After`) | ✅ |
+| Configurable redaction depth per tenant (`MemoryPolicy.federationSummaryChars`) | ✅ |
+| Distributed (shared) rate limiter across instances | ⏳ (follow-up) |
+| Per-peer authentication / mutual trust on outbound federation | ⏳ (follow-up) |
 
 ---
 

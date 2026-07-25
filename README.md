@@ -36,8 +36,9 @@ cd ../.. && mvn spring-boot:run -pl memory-api
 | `POST` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories/{memoryId}/contribute` | Record a distinct additional contributor (shared reinforcement) |
 | `GET` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories/count` | Active memory count for a team |
 | `DELETE` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories/{memoryId}` | Delete a specific memory |
-| `POST` | `/api/v1/federation/query` | Privacy-preserving cross-instance memory query |
-| `GET`/`PUT` | `/api/v1/tenants/{tenantId}/memory-policy` | Read / replace a tenant's governance policy |
+| `POST` | `/api/v1/federation/query` | Privacy-preserving cross-instance query — rate-limited per origin; `"includePeers": true` fans out to configured peer instances |
+| `GET` | `/api/v1/federation/audit` | Recent federation-query audit (who queried, what type, how many results) |
+| `GET`/`PUT` | `/api/v1/tenants/{tenantId}/memory-policy` | Read / replace a tenant's governance policy (incl. `federationSummaryChars` redaction depth) |
 | `GET` | `/actuator/health` | Liveness + readiness probes |
 
 ## Memory Model
@@ -92,4 +93,7 @@ Aether Memory owns the **Shared Memory** capability exclusively. Personal memory
 | `MEMORY_DECAY_ENABLED` | `true` | Toggle the scheduled decay/archive lifecycle |
 | `MEMORY_DECAY_RATE` | `0.01` | Default strength lost per idle day (tenants may override) |
 | `MEMORY_ARCHIVE_THRESHOLD` | `0.1` | Default archive cutoff strength (tenants may override) |
+| `aether.memory.federation.rate-limit.max-per-window` | `60` | Max federation queries per origin per window |
+| `aether.memory.federation.rate-limit.window-seconds` | `60` | Rate-limit window length (seconds) |
+| `aether.memory.federation.peers` | _(empty)_ | Comma-separated peer base URLs for outbound fan-out (empty = local-only) |
 | `SERVER_PORT` | `8083` | HTTP port |

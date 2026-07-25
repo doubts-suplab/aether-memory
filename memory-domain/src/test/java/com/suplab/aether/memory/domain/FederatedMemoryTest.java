@@ -43,6 +43,36 @@ class FederatedMemoryTest {
     }
 
     @Test
+    void from_withRedactionDepth_truncatesToDepth() {
+        var memory = SharedMemory.create(SCOPE, MemoryType.SEMANTIC,
+                "the quick brown fox jumps over the lazy dog", MemoryVisibility.FEDERATED);
+
+        var federated = FederatedMemory.from(memory, "tenant-9", 9);
+
+        assertThat(federated.summary()).hasSizeLessThanOrEqualTo(9);
+        assertThat(federated.summary()).endsWith("…");
+    }
+
+    @Test
+    void from_withZeroRedactionDepth_exposesNoContent() {
+        var memory = SharedMemory.create(SCOPE, MemoryType.SEMANTIC, "secret", MemoryVisibility.FEDERATED);
+
+        var federated = FederatedMemory.from(memory, "tenant-9", 0);
+
+        assertThat(federated.summary()).isEmpty();
+    }
+
+    @Test
+    void from_redactionDepthIsCappedAtMax() {
+        var longContent = "y".repeat(500);
+        var memory = SharedMemory.create(SCOPE, MemoryType.EPISODIC, longContent, MemoryVisibility.FEDERATED);
+
+        var federated = FederatedMemory.from(memory, "tenant-9", 10_000);
+
+        assertThat(federated.summary()).hasSize(FederatedMemory.MAX_SUMMARY_LENGTH);
+    }
+
+    @Test
     void constructor_defaultsBlankProvenanceToFederated() {
         var federated = new FederatedMemory(MemoryType.SEMANTIC, "summary", 0.5, "  ");
 

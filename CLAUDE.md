@@ -19,7 +19,7 @@
 
 **Capability owned (exclusively):** *Shared Memory* — Team Memory, Shared Reinforcement, Memory Federation API, Configurable Policies. Personal memory remains owned by Aether Core; Memory does not duplicate it.
 
-**Current status:** Phase 1 — Shared Memory Engine ✅ complete (semantic search endpoint, contributor API, policy-sourced reinforcement end-to-end, Testcontainers ITs wired into CI). Next: Phase 2 — Federation hardening.
+**Current status:** Phase 1 — Shared Memory Engine ✅ complete. Phase 2 — Federation hardening 🔄 core complete: an **append-only federation audit log** (`GET /federation/audit`), **per-origin rate limiting** on `/federation/query` (429 when exceeded), **per-tenant redaction depth** (`MemoryPolicy.federationSummaryChars` — each tenant controls how much of its content may leak), and an **outbound peer client** (`includePeers` fan-out to configured peer instances, gated by config); Testcontainers ITs. Follow-up: distributed (shared) rate limiter, per-peer auth.
 
 **One runnable application:**
 - `memory-api` — Shared Memory Platform API (port 8083)
@@ -52,8 +52,9 @@
 - Database: `aether_memory` (separate schema — data isolation from Core and Grid)
 - REST API surface:
   - `.../teams/{teamId}/memories` — team-scoped shared memory CRUD
-  - `POST /api/v1/federation/query` — privacy-preserving cross-instance query
-  - `GET|PUT /api/v1/tenants/{tenantId}/memory-policy` — per-tenant governance
+  - `POST /api/v1/federation/query` — privacy-preserving cross-instance query (rate-limited per origin; `includePeers` fans out to peer instances)
+  - `GET /api/v1/federation/audit` — recent federation-query audit (who queried, what, how many)
+  - `GET|PUT /api/v1/tenants/{tenantId}/memory-policy` — per-tenant governance (incl. federation redaction depth)
 
 ---
 
@@ -89,8 +90,8 @@ memory-infra  (no Java)
 | **MemoryScope** | The `tenantId` + `teamId` ownership key — the multi-tenancy boundary. |
 | **MemoryVisibility** | `PRIVATE` (team) → `TENANT` (all teams in tenant) → `FEDERATED` (cross-instance). |
 | **Shared Reinforcement** | Every team retrieval reinforces a memory; every distinct contributor raises `contributorCount`. |
-| **MemoryPolicy** | Per-tenant decay rate, grace period, reinforcement increment, archive threshold, retention, federation toggle. |
-| **Federation** | Privacy-preserving cross-instance query — only `FEDERATED` memories in federation-enabled tenants, projected to bounded summaries with coarse provenance. |
+| **MemoryPolicy** | Per-tenant decay rate, grace period, reinforcement increment, archive threshold, retention, federation toggle, and **federation redaction depth** (`federationSummaryChars`). |
+| **Federation** | Privacy-preserving cross-instance query — only `FEDERATED` memories in federation-enabled tenants, projected to bounded summaries with coarse provenance, at each source tenant's redaction depth. Governed by a per-origin rate limiter and an append-only audit log; can fan out to configured peer instances. |
 
 ---
 

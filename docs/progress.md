@@ -5,13 +5,13 @@
 
 ---
 
-**Active Phase:** Phase 1 — Shared Memory Engine ✅ (complete) · next: Phase 2 — Federation
+**Active Phase:** Phase 2 — Federation hardening 🔄 (core complete: audit + per-origin rate limiting + per-tenant redaction depth + outbound peer fan-out)
 
 | Phase | Name | Status | Sessions |
 |---|---|---|---|
 | 0 | Scaffold | ✅ Complete | 1 |
 | 1 | Shared Memory Engine | ✅ Complete | 2 |
-| 2 | Federation | ⏳ Planned | — |
+| 2 | Federation | 🔄 Core complete (audit + rate-limit + redaction + peer fan-out) | 3 |
 | 3 | Governance & Policy | ⏳ Planned | — |
 | 4 | Kubernetes + Helm | ⏳ Planned | — |
 
@@ -70,6 +70,53 @@
 **Docs:**
 - `README.md`, `docs/index.html`, `docs/architecture.md`, `docs/roadmap.md`, `docs/progress.md`
 - GitHub Actions: `ci.yml`, `quality-gate.yml`, `docker-build.yml`
+
+---
+
+## Phase 2 — Federation hardening 🔄 (session 3)
+
+**Commit:** `feat(memory): federation hardening — audit, per-origin rate limiting, redaction depth, peer fan-out (V005)`
+
+Phase 1 built inbound federation (privacy-preserving projection). Phase 2 *governs* it and adds the
+outbound reach the roadmap's "hardening" goal calls for.
+
+### What was done
+
+**Audit (accountability):**
+- `FederationAuditEvent` domain record + `FederationAuditStore` port + `JdbcFederationAuditStore` —
+  **append-only** (record + `recent`; no update/delete). Stores origin, type, a bounded query label
+  (≤120 chars), result count, timestamp — never memory content or team identity. `V005`
+  `federation_audit` table. Surfaced by `GET /api/v1/federation/audit`.
+
+**Per-origin rate limiting:**
+- `FederationRateLimiter` port + `InMemoryFederationRateLimiter` (per-origin tumbling window, atomic
+  `compute`, injectable clock). `/federation/query` returns `429` + `Retry-After` when an origin
+  exceeds its budget. Config: `aether.memory.federation.rate-limit.*` (default 60/60s).
+
+**Per-tenant redaction depth:**
+- `MemoryPolicy` gains `federationSummaryChars` (0–280; a 7-arg convenience constructor keeps old
+  call-sites valid). `FederatedMemory.from(memory, provenance, maxChars)` truncates to the depth
+  (0 = fully redacted). The federation service projects each candidate at its **owning tenant's**
+  depth — a tenant controls exactly how much of its content may leak. `V005` adds the column; the
+  policy endpoint reads/writes it.
+
+**Outbound peer client:**
+- `FederationPeerClient` port + `HttpFederationPeerClient` (RestClient fan-out to configured peers,
+  per-peer failure tolerated, empty peer list = no-op). `MemoryFederationPort.federatedFanout`
+  merges local + peers by strength; `"includePeers": true` on `/federation/query` triggers it.
+  Config: `aether.memory.federation.peers` (comma-separated; empty = standalone).
+
+**Tests — 76 unit tests green:**
+- Domain `FederationAuditEventTest`, `FederatedMemoryTest` redaction cases; engine
+  `DefaultMemoryFederationServiceTest` (redaction-per-owner, audit recorded, fan-out merge),
+  `InMemoryFederationRateLimiterTest` (per-origin window reset), `HttpFederationPeerClientTest`
+  (no-peers / unreachable tolerated); api `MemoryFederationControllerTest` (429, includePeers,
+  audit view). New `JdbcFederationAuditStoreIT` under failsafe.
+- `mvn -DskipITs verify` passes the JaCoCo 80% gate.
+
+### Remaining Phase 2 (follow-up)
+- **Distributed (shared) rate limiter** across instances (the in-memory limiter is per-node).
+- **Per-peer authentication / mutual trust** on outbound federation.
 
 ---
 
