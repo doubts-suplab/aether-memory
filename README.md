@@ -1,4 +1,4 @@
-# Aether Memory
+# Æ Aether Memory
 
 > Shared team and organisational memory — the platform layer that generalises personal cognition to groups, with privacy-preserving federation across instances.
 
