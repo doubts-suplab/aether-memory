@@ -32,7 +32,7 @@ public class JdbcMemoryPolicyStore implements MemoryPolicyStore {
     public MemoryPolicy resolve(String tenantId) {
         var sql = """
                 SELECT tenant_id, decay_rate, decay_after_days, reinforcement_increment,
-                       archive_threshold, retention_days, federation_enabled
+                       archive_threshold, retention_days, federation_enabled, federation_summary_chars
                 FROM memory_policies
                 WHERE tenant_id = :tenantId
                 """;
@@ -49,10 +49,11 @@ public class JdbcMemoryPolicyStore implements MemoryPolicyStore {
         var sql = """
                 INSERT INTO memory_policies
                     (tenant_id, decay_rate, decay_after_days, reinforcement_increment,
-                     archive_threshold, retention_days, federation_enabled, updated_at)
+                     archive_threshold, retention_days, federation_enabled, federation_summary_chars,
+                     updated_at)
                 VALUES
                     (:tenantId, :decayRate, :decayAfterDays, :reinforcementIncrement,
-                     :archiveThreshold, :retentionDays, :federationEnabled, NOW())
+                     :archiveThreshold, :retentionDays, :federationEnabled, :federationSummaryChars, NOW())
                 ON CONFLICT (tenant_id) DO UPDATE SET
                     decay_rate = EXCLUDED.decay_rate,
                     decay_after_days = EXCLUDED.decay_after_days,
@@ -60,6 +61,7 @@ public class JdbcMemoryPolicyStore implements MemoryPolicyStore {
                     archive_threshold = EXCLUDED.archive_threshold,
                     retention_days = EXCLUDED.retention_days,
                     federation_enabled = EXCLUDED.federation_enabled,
+                    federation_summary_chars = EXCLUDED.federation_summary_chars,
                     updated_at = NOW()
                 """;
         var params = new MapSqlParameterSource()
@@ -69,7 +71,8 @@ public class JdbcMemoryPolicyStore implements MemoryPolicyStore {
                 .addValue("reinforcementIncrement", policy.reinforcementIncrement())
                 .addValue("archiveThreshold", policy.archiveThreshold())
                 .addValue("retentionDays", policy.retentionDays())
-                .addValue("federationEnabled", policy.federationEnabled());
+                .addValue("federationEnabled", policy.federationEnabled())
+                .addValue("federationSummaryChars", policy.federationSummaryChars());
         jdbc.update(sql, params);
         log.info("Saved memory policy tenantId={} decayRate={} federationEnabled={}",
                 policy.tenantId(), policy.decayRate(), policy.federationEnabled());
@@ -79,7 +82,7 @@ public class JdbcMemoryPolicyStore implements MemoryPolicyStore {
     public List<MemoryPolicy> findAll() {
         var sql = """
                 SELECT tenant_id, decay_rate, decay_after_days, reinforcement_increment,
-                       archive_threshold, retention_days, federation_enabled
+                       archive_threshold, retention_days, federation_enabled, federation_summary_chars
                 FROM memory_policies
                 ORDER BY tenant_id
                 """;
@@ -94,7 +97,8 @@ public class JdbcMemoryPolicyStore implements MemoryPolicyStore {
                 rs.getDouble("reinforcement_increment"),
                 rs.getDouble("archive_threshold"),
                 rs.getInt("retention_days"),
-                rs.getBoolean("federation_enabled")
+                rs.getBoolean("federation_enabled"),
+                rs.getInt("federation_summary_chars")
         );
     }
 }

@@ -39,10 +39,30 @@ public record FederatedMemory(
      * @param provenance the coarse origin label to expose (never the raw {@code teamId})
      */
     public static FederatedMemory from(SharedMemory memory, String provenance) {
+        return from(memory, provenance, MAX_SUMMARY_LENGTH);
+    }
+
+    /**
+     * Projects a {@link SharedMemory} into a federated result at a caller-supplied <em>redaction
+     * depth</em> — the maximum characters of content the owning tenant permits to leak (its
+     * {@link MemoryPolicy#federationSummaryChars()}). The depth is clamped to
+     * {@link #MAX_SUMMARY_LENGTH}; a depth of 0 exposes no content at all.
+     *
+     * @param memory     the source memory (must be {@link MemoryVisibility#FEDERATED})
+     * @param provenance the coarse origin label to expose (never the raw {@code teamId})
+     * @param maxChars   the owning tenant's redaction depth
+     */
+    public static FederatedMemory from(SharedMemory memory, String provenance, int maxChars) {
+        int depth = Math.max(0, Math.min(maxChars, MAX_SUMMARY_LENGTH));
         var content = memory.content();
-        var summary = content.length() <= MAX_SUMMARY_LENGTH
-                ? content
-                : content.substring(0, MAX_SUMMARY_LENGTH - 1) + "…";
+        String summary;
+        if (depth == 0) {
+            summary = "";
+        } else if (content.length() <= depth) {
+            summary = content;
+        } else {
+            summary = content.substring(0, Math.max(0, depth - 1)) + "…";
+        }
         return new FederatedMemory(memory.type(), summary, memory.strength(), provenance);
     }
 }

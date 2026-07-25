@@ -50,9 +50,11 @@ MemoryScope        = (tenantId, teamId)   — the ownership + isolation key
 MemoryVisibility   = PRIVATE | TENANT | FEDERATED
 MemoryType         = EPISODIC | SEMANTIC | PROCEDURAL | EMOTIONAL
 MemoryPolicy       = per-tenant (decayRate, decayAfterDays, reinforcementIncrement,
-                                 archiveThreshold, retentionDays, federationEnabled)
+                                 archiveThreshold, retentionDays, federationEnabled,
+                                 federationSummaryChars)   — incl. redaction depth
 FederationQuery    = (originTenantId, type?, queryText, limit)
 FederatedMemory    = (type, summary≤280, strength, provenance)   — privacy-preserving projection
+FederationAuditEvent = (originTenantId, type?, queryLabel≤120, resultCount, occurredAt)
 ```
 
 ### Ports
@@ -60,8 +62,11 @@ FederatedMemory    = (type, summary≤280, strength, provenance)   — privacy-p
 | Port | Implementation | Purpose |
 |---|---|---|
 | `SharedMemoryStore` | `PGVectorSharedMemoryStore` | Persist/retrieve team memory; reinforce on read; `contribute` (distinct-contributor signal); federatable fan-out |
-| `MemoryPolicyStore` | `JdbcMemoryPolicyStore` | Resolve/save per-tenant policy (defaults when unset) |
-| `MemoryFederationPort` | `DefaultMemoryFederationService` | Privacy-preserving cross-instance query |
+| `MemoryPolicyStore` | `JdbcMemoryPolicyStore` | Resolve/save per-tenant policy (defaults when unset), incl. redaction depth |
+| `MemoryFederationPort` | `DefaultMemoryFederationService` | Privacy-preserving cross-instance query + peer fan-out; per-owner redaction; audits every query |
+| `FederationAuditStore` | `JdbcFederationAuditStore` | Append-only log of served federation queries |
+| `FederationRateLimiter` | `InMemoryFederationRateLimiter` | Per-origin fixed-window throttle on `/federation/query` |
+| `FederationPeerClient` | `HttpFederationPeerClient` | Outbound fan-out to configured peer instances (optional; gated by config) |
 | `MemoryLifecyclePort` | `PolicyAwareMemoryLifecycleService` | Per-tenant decay + archive |
 
 ---
@@ -74,6 +79,7 @@ FederatedMemory    = (type, summary≤280, strength, provenance)   — privacy-p
 | `V002` | `shared_memories.embedding vector(384)` | IVFFlat cosine index (`lists=100`) |
 | `V003` | `memory_policies` | One configurable policy per tenant; overrides only |
 | `V004` | `shared_memories_archive` | Faded memories moved here (keeps embedding for restore) |
+| `V005` | `federation_audit` + `memory_policies.federation_summary_chars` | Append-only federation-query audit; per-tenant redaction depth (0–280) |
 
 All embeddings are 384-dim (all-MiniLM-L6-v2), consistent across the ecosystem.
 
@@ -87,10 +93,12 @@ All embeddings are 384-dim (all-MiniLM-L6-v2), consistent across the ecosystem.
 3. `POST …/teams/{teamId}/memories/search` (body `{"query","limit"}`) → embed the query → `findSimilar` cosine search **within the team scope**, reinforced on read by the tenant increment (semantic retrieval + policy-sourced reinforcement, end-to-end).
 4. `POST …/teams/{teamId}/memories/{id}/contribute` → `SharedMemoryStore.contribute` runs a scoped `UPDATE … contributor_count + 1, strength = LEAST(1.0, …) … RETURNING …` (the shared-reinforcement signal); 404 when the memory is not in scope.
 
-### 5.2 Federation (privacy-preserving)
-1. `POST /api/v1/federation/query` → `DefaultMemoryFederationService` embeds `queryText`.
-2. `SharedMemoryStore.findFederatable` joins `memory_policies` and returns only `FEDERATED` rows in `federation_enabled` tenants.
-3. Results are projected to `FederatedMemory` (bounded summary, coarse provenance = source tenant), count clamped to `MAX_FEDERATION_LIMIT`.
+### 5.2 Federation (privacy-preserving, hardened)
+1. `POST /api/v1/federation/query` → the origin is **rate-limited** (`FederationRateLimiter`, per-origin fixed window); an over-budget origin gets `429` + `Retry-After`.
+2. `DefaultMemoryFederationService` embeds `queryText`; `SharedMemoryStore.findFederatable` joins `memory_policies` and returns only `FEDERATED` rows in `federation_enabled` tenants.
+3. Each candidate is projected to `FederatedMemory` at its **owning tenant's redaction depth** (`MemoryPolicy.federationSummaryChars` — 0 = fully redacted), coarse provenance = source tenant, count clamped to `MAX_FEDERATION_LIMIT`. Team/contributor identity never crosses the boundary.
+4. The served query is written to the append-only `federation_audit` (origin, type, bounded query label, result count) — surfaced by `GET /federation/audit`.
+5. With `"includePeers": true`, `federatedFanout` also queries every configured peer via `HttpFederationPeerClient`, merges by strength, and re-clamps. Peer failures are tolerated (skipped); with no peers configured it is local-only, so Memory runs standalone.
 
 ### 5.3 Lifecycle (per-tenant, set-based)
 1. Scheduler (`@Scheduled`, default 03:00) → `MemoryLifecyclePort.runLifecycle`.

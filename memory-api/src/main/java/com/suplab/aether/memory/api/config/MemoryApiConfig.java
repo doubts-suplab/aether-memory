@@ -2,9 +2,15 @@ package com.suplab.aether.memory.api.config;
 
 import com.suplab.aether.memory.engine.embedding.SharedEmbeddingService;
 import com.suplab.aether.memory.engine.federation.DefaultMemoryFederationService;
+import com.suplab.aether.memory.engine.federation.HttpFederationPeerClient;
+import com.suplab.aether.memory.engine.federation.InMemoryFederationRateLimiter;
+import com.suplab.aether.memory.engine.federation.JdbcFederationAuditStore;
 import com.suplab.aether.memory.engine.lifecycle.PolicyAwareMemoryLifecycleService;
 import com.suplab.aether.memory.engine.policy.JdbcMemoryPolicyStore;
 import com.suplab.aether.memory.engine.store.PGVectorSharedMemoryStore;
+import com.suplab.aether.memory.ports.FederationAuditStore;
+import com.suplab.aether.memory.ports.FederationPeerClient;
+import com.suplab.aether.memory.ports.FederationRateLimiter;
 import com.suplab.aether.memory.ports.MemoryFederationPort;
 import com.suplab.aether.memory.ports.MemoryLifecyclePort;
 import com.suplab.aether.memory.ports.MemoryPolicyStore;
@@ -14,15 +20,20 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.web.client.RestClient;
 
+import java.time.Duration;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 
 /**
  * Spring configuration for Aether Memory API beans.
  *
  * <p>Wires the pgvector shared-memory store, Ollama embedding service, per-tenant policy store,
- * federation service, and lifecycle service using constructor injection. All beans are declared
- * here — never via field {@code @Autowired}.</p>
+ * federation service (with its audit log, per-origin rate limiter, and optional peer client), and
+ * lifecycle service using constructor injection. All beans are declared here — never via field
+ * {@code @Autowired}.</p>
  */
 @Configuration
 public class MemoryApiConfig {
@@ -44,13 +55,64 @@ public class MemoryApiConfig {
     }
 
     /**
+     * Creates the append-only federation audit store ({@code federation_audit} table).
+     */
+    @Bean
+    public FederationAuditStore federationAuditStore(NamedParameterJdbcTemplate jdbc) {
+        return new JdbcFederationAuditStore(jdbc);
+    }
+
+    /**
+     * Creates the per-origin federation rate limiter (in-memory fixed window).
+     *
+     * @param maxPerWindow  maximum federation queries per origin per window (default 60)
+     * @param windowSeconds window length in seconds (default 60)
+     */
+    @Bean
+    public FederationRateLimiter federationRateLimiter(
+            @Value("${aether.memory.federation.rate-limit.max-per-window:60}") int maxPerWindow,
+            @Value("${aether.memory.federation.rate-limit.window-seconds:60}") int windowSeconds) {
+        return new InMemoryFederationRateLimiter(maxPerWindow, windowSeconds);
+    }
+
+    /**
+     * Creates the outbound federation peer client — enabled only when peers are configured.
+     *
+     * <p>{@code aether.memory.federation.peers} is a comma-separated list of peer base URLs. When
+     * empty (default) no bean is created and fan-out queries resolve to local-only, so Memory runs
+     * standalone. Peers are the only outbound network dependency.</p>
+     *
+     * @param peersCsv       comma-separated peer base URLs
+     * @param timeoutSeconds per-peer request timeout in seconds (default 10)
+     */
+    @Bean
+    @ConditionalOnProperty(name = "aether.memory.federation.peers")
+    public FederationPeerClient federationPeerClient(
+            @Value("${aether.memory.federation.peers:}") String peersCsv,
+            @Value("${aether.memory.federation.peer-timeout-seconds:10}") long timeoutSeconds) {
+        List<String> peers = Arrays.stream(peersCsv.split(","))
+                .map(String::trim).filter(s -> !s.isBlank()).toList();
+        var requestFactory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(timeoutSeconds));
+        requestFactory.setReadTimeout(Duration.ofSeconds(timeoutSeconds));
+        var restClient = RestClient.builder().requestFactory(requestFactory).build();
+        return new HttpFederationPeerClient(peers, restClient);
+    }
+
+    /**
      * Creates the privacy-preserving federation service. The embedding service is optional so
-     * federation remains available (degraded to zero-vector matching) when Ollama is disabled.
+     * federation remains available (degraded to zero-vector matching) when Ollama is disabled; the
+     * peer client is optional so the service runs standalone; the policy store drives per-tenant
+     * redaction depth and the audit store records every served query.
      */
     @Bean
     public MemoryFederationPort memoryFederationPort(SharedMemoryStore memoryStore,
-                                                     Optional<SharedEmbeddingService> embeddingService) {
-        return new DefaultMemoryFederationService(memoryStore, embeddingService);
+                                                     Optional<SharedEmbeddingService> embeddingService,
+                                                     MemoryPolicyStore policyStore,
+                                                     FederationAuditStore auditStore,
+                                                     Optional<FederationPeerClient> peerClient) {
+        return new DefaultMemoryFederationService(memoryStore, embeddingService, policyStore, auditStore,
+                peerClient);
     }
 
     /**

@@ -15,6 +15,9 @@ package com.suplab.aether.memory.domain;
  * @param archiveThreshold      memories below this strength are archived (0–1)
  * @param retentionDays         days an archived memory is retained before it is eligible for purge
  * @param federationEnabled     whether {@code FEDERATED} memories may leave this tenant
+ * @param federationSummaryChars max characters of this tenant's memory content exposed in a
+ *                              federated projection — the tenant's <em>redaction depth</em>
+ *                              (0 = fully redacted; capped at {@link FederatedMemory#MAX_SUMMARY_LENGTH})
  */
 public record MemoryPolicy(
         String tenantId,
@@ -23,7 +26,8 @@ public record MemoryPolicy(
         double reinforcementIncrement,
         double archiveThreshold,
         int retentionDays,
-        boolean federationEnabled
+        boolean federationEnabled,
+        int federationSummaryChars
 ) {
     public MemoryPolicy {
         if (tenantId == null || tenantId.isBlank()) throw new IllegalArgumentException("tenantId required");
@@ -34,14 +38,31 @@ public record MemoryPolicy(
         if (archiveThreshold < 0 || archiveThreshold > 1)
             throw new IllegalArgumentException("archiveThreshold must be 0-1");
         if (retentionDays < 0) throw new IllegalArgumentException("retentionDays must be >= 0");
+        if (federationSummaryChars < 0)
+            throw new IllegalArgumentException("federationSummaryChars must be >= 0");
+        if (federationSummaryChars > FederatedMemory.MAX_SUMMARY_LENGTH)
+            federationSummaryChars = FederatedMemory.MAX_SUMMARY_LENGTH;
+    }
+
+    /**
+     * Convenience constructor for the pre-redaction-depth policy shape; the tenant's redaction depth
+     * defaults to the maximum federated summary length (least redaction).
+     */
+    public MemoryPolicy(String tenantId, double decayRate, int decayAfterDays,
+                        double reinforcementIncrement, double archiveThreshold, int retentionDays,
+                        boolean federationEnabled) {
+        this(tenantId, decayRate, decayAfterDays, reinforcementIncrement, archiveThreshold, retentionDays,
+                federationEnabled, FederatedMemory.MAX_SUMMARY_LENGTH);
     }
 
     /**
      * The default policy applied to any tenant that has not configured its own. Values mirror
      * Aether Core's lifecycle defaults (decay 0.01/day after a 7-day grace, archive below 0.1)
-     * with federation disabled — sharing across instances is always an explicit opt-in.
+     * with federation disabled — sharing across instances is always an explicit opt-in — and the
+     * full summary length as the redaction depth.
      */
     public static MemoryPolicy defaults(String tenantId) {
-        return new MemoryPolicy(tenantId, 0.01, 7, 0.1, 0.1, 90, false);
+        return new MemoryPolicy(tenantId, 0.01, 7, 0.1, 0.1, 90, false,
+                FederatedMemory.MAX_SUMMARY_LENGTH);
     }
 }

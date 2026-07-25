@@ -17,11 +17,22 @@ import java.util.List;
 public interface MemoryFederationPort {
 
     /**
-     * Executes a federation query and returns privacy-preserving projections ordered by
-     * semantic relevance.
+     * Executes a federation query against this instance's own federatable memories and returns
+     * privacy-preserving projections ordered by semantic relevance. This is the read path a remote
+     * peer (or a local caller) uses to see this instance's shared knowledge.
      *
      * @param query the federation request (origin tenant, optional type, query text, limit)
      * @return ordered list of federated projections (may be empty); never {@code null}
      */
     List<FederatedMemory> federatedSearch(FederationQuery query);
+
+    /**
+     * Executes a federation query across this instance <em>and</em> every configured peer instance,
+     * merging the projections. Peer failures are tolerated (skipped). When no peers are configured
+     * this is equivalent to {@link #federatedSearch}.
+     *
+     * @param query the federation request
+     * @return the merged, relevance-ordered projections from local + peers (clamped); never {@code null}
+     */
+    List<FederatedMemory> federatedFanout(FederationQuery query);
 }
