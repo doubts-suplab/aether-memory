@@ -80,3 +80,19 @@
 | Helm chart `memory-infra/helm/aether-memory/` | ⏳ |
 | HPA (min 2, max 8 replicas) | ✅ (manifest) |
 | Docker build + Helm release workflows | ⏳ |
+
+---
+
+## Ecosystem review — future backlog
+
+> Repo-specific items from the [ecosystem improvement backlog](https://github.com/doubts-suplab/aether/blob/main/docs/roadmaps/ecosystem-improvements.md). Planned, not started.
+> Feasibility: **S** small · **M** moderate · **L** large. License unchanged (AGPL-3.0).
+
+| Item | Feasibility |
+|---|---|
+| Federation robustness — failure handling, consistency, richer projection *(partly addressed in Phase 2: audit + rate-limit + peer fan-out)* | M |
+| Distributed (shared) rate limiter + per-peer auth *(Phase 2 follow-up)* | M–L |
+| Multi-team / multi-org memory graphs | M–L |
+| Richer policy language | M |
+| Shared-reinforcement performance under concurrent access | M |
+| Clearer ownership boundary vs Core personal memory (doc + enforcement) | S–M |
