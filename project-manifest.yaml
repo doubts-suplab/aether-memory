@@ -1,0 +1,63 @@
+# EEIK Project Manifest — Aether Memory
+# Canonical manifest (schema_version 1.0) — validates against eeik/schemas/manifest.schema.json.
+# Replaces the pre-canonical aether.manifest.yaml. Adopted at the manifest level; engine-driven
+# activate/lock/verify against an external repo is an eeik follow-up.
+
+schema_version: "1.0"
+
+project:
+  name: aether-memory
+  description: >
+    Shared team/organisational memory platform — generalises Core's per-user cognition to groups,
+    with privacy-preserving federation across instances.
+  owner: suplab
+  domain: generic
+  project_type: enterprise-platform
+
+technology:
+  backend:
+    language: java
+    version: 21
+    framework: spring-boot
+  database:
+    type: postgresql
+    migration_tool: flyway
+    orm: jdbctemplate
+  containerisation:
+    runtime: docker
+
+architecture:
+  style: modular-monolith
+  patterns:
+    - ddd
+  api_style: rest
+
+cloud:
+  provider: local-first
+  infra_as_code: none
+  multi_account: false
+  finops: false
+
+ai:
+  enabled: true
+  pattern: rag
+  framework: none
+  foundation_model: ollama
+  governance_required: true
+  memory_pattern: vector-store
+
+governance:
+  profile: enterprise
+  reviews_required:
+    - architecture-review
+    - security-review
+  compliance_frameworks:
+    - gdpr
+  adr_required: true
+  coverage_threshold: 80
+
+delivery:
+  model: single-team
+  methodology: incremental
+  sprint_length_weeks: 2
+  cicd_platform: github-actions
