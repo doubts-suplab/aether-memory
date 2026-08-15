@@ -32,10 +32,22 @@ public class HttpFederationPeerClient implements FederationPeerClient {
 
     private final List<String> peerBaseUrls;
     private final RestClient restClient;
+    private final String bearerToken;
 
+    /** Constructs a peer client with no outbound authentication. */
     public HttpFederationPeerClient(List<String> peerBaseUrls, RestClient restClient) {
+        this(peerBaseUrls, restClient, null);
+    }
+
+    /**
+     * @param bearerToken shared token sent as {@code Authorization: Bearer <token>} to each peer, so a
+     *                    peer that requires authentication accepts the fan-out; {@code null}/blank sends
+     *                    no header (peers that run open still work).
+     */
+    public HttpFederationPeerClient(List<String> peerBaseUrls, RestClient restClient, String bearerToken) {
         this.peerBaseUrls = peerBaseUrls == null ? List.of() : List.copyOf(peerBaseUrls);
         this.restClient = restClient;
+        this.bearerToken = bearerToken == null ? "" : bearerToken.trim();
     }
 
     @Override
@@ -52,8 +64,11 @@ public class HttpFederationPeerClient implements FederationPeerClient {
         for (String base : peerBaseUrls) {
             var url = base.replaceAll("/+$", "") + "/api/v1/federation/query";
             try {
-                var rows = restClient.post().uri(url)
-                        .contentType(MediaType.APPLICATION_JSON)
+                var request = restClient.post().uri(url).contentType(MediaType.APPLICATION_JSON);
+                if (!bearerToken.isBlank()) {
+                    request = request.header("Authorization", "Bearer " + bearerToken);
+                }
+                var rows = request
                         .body(body)
                         .retrieve()
                         .body(LIST_OF_MAPS);

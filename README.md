@@ -36,7 +36,7 @@ cd ../.. && mvn spring-boot:run -pl memory-api
 | `POST` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories/{memoryId}/contribute` | Record a distinct additional contributor (shared reinforcement) |
 | `GET` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories/count` | Active memory count for a team |
 | `DELETE` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories/{memoryId}` | Delete a specific memory |
-| `POST` | `/api/v1/federation/query` | Privacy-preserving cross-instance query — rate-limited per origin; `"includePeers": true` fans out to configured peer instances |
+| `POST` | `/api/v1/federation/query` | Privacy-preserving cross-instance query — optional per-peer bearer auth (401 when required + missing/invalid), rate-limited per origin; `"includePeers": true` fans out to configured peer instances |
 | `GET` | `/api/v1/federation/audit` | Recent federation-query audit (who queried, what type, how many results) |
 | `GET`/`PUT` | `/api/v1/tenants/{tenantId}/memory-policy` | Read / replace a tenant's governance policy (incl. `federationSummaryChars` redaction depth) |
 | `GET` | `/actuator/health` | Liveness + readiness probes |
@@ -96,4 +96,7 @@ Aether Memory owns the **Shared Memory** capability exclusively. Personal memory
 | `aether.memory.federation.rate-limit.max-per-window` | `60` | Max federation queries per origin per window |
 | `aether.memory.federation.rate-limit.window-seconds` | `60` | Rate-limit window length (seconds) |
 | `aether.memory.federation.peers` | _(empty)_ | Comma-separated peer base URLs for outbound fan-out (empty = local-only) |
+| `FEDERATION_REQUIRE_AUTH` | `false` | Require a bearer token on inbound `/federation/query` (fail-closed: needs `FEDERATION_AUTH_TOKEN`) |
+| `FEDERATION_AUTH_TOKEN` | _(empty)_ | Shared inbound token peers must present as `Authorization: Bearer …` |
+| `FEDERATION_PEER_AUTH_TOKEN` | _(empty)_ | Outbound bearer token sent to configured peers on fan-out |
 | `SERVER_PORT` | `8083` | HTTP port |

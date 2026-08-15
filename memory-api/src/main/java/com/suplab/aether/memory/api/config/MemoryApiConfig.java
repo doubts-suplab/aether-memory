@@ -2,6 +2,7 @@ package com.suplab.aether.memory.api.config;
 
 import com.suplab.aether.memory.engine.embedding.SharedEmbeddingService;
 import com.suplab.aether.memory.engine.federation.DefaultMemoryFederationService;
+import com.suplab.aether.memory.api.security.FederationAuthenticator;
 import com.suplab.aether.memory.engine.federation.HttpFederationPeerClient;
 import com.suplab.aether.memory.engine.federation.InMemoryFederationRateLimiter;
 import com.suplab.aether.memory.engine.federation.JdbcFederationAuditStore;
@@ -89,14 +90,28 @@ public class MemoryApiConfig {
     @ConditionalOnProperty(name = "aether.memory.federation.peers")
     public FederationPeerClient federationPeerClient(
             @Value("${aether.memory.federation.peers:}") String peersCsv,
-            @Value("${aether.memory.federation.peer-timeout-seconds:10}") long timeoutSeconds) {
+            @Value("${aether.memory.federation.peer-timeout-seconds:10}") long timeoutSeconds,
+            @Value("${aether.memory.federation.peer-auth-token:}") String peerAuthToken) {
         List<String> peers = Arrays.stream(peersCsv.split(","))
                 .map(String::trim).filter(s -> !s.isBlank()).toList();
         var requestFactory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(timeoutSeconds));
         requestFactory.setReadTimeout(Duration.ofSeconds(timeoutSeconds));
         var restClient = RestClient.builder().requestFactory(requestFactory).build();
-        return new HttpFederationPeerClient(peers, restClient);
+        return new HttpFederationPeerClient(peers, restClient, peerAuthToken);
+    }
+
+    /**
+     * Creates the inbound federation authenticator. When {@code aether.memory.federation.require-auth}
+     * is true, {@code /federation/query} requires {@code Authorization: Bearer <auth-token>} — a
+     * misconfiguration (require-auth without a token) fails construction. Off by default so Memory runs
+     * open standalone; the shared token is sourced from the environment (never hardcoded).
+     */
+    @Bean
+    public FederationAuthenticator federationAuthenticator(
+            @Value("${aether.memory.federation.require-auth:false}") boolean requireAuth,
+            @Value("${aether.memory.federation.auth-token:}") String authToken) {
+        return new FederationAuthenticator(requireAuth, authToken);
     }
 
     /**

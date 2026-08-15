@@ -31,4 +31,18 @@ class HttpFederationPeerClientTest {
                 List.of("http://127.0.0.1:1"), RestClient.create());
         assertThat(client.queryPeers(QUERY)).isEmpty();
     }
+
+    @Test
+    void withBearerToken_unreachablePeerStillTolerated() {
+        // A configured outbound token attaches an Authorization header; delivery stays best-effort.
+        var client = new HttpFederationPeerClient(
+                List.of("http://127.0.0.1:1"), RestClient.create(), "s3cret");
+        assertThat(client.queryPeers(QUERY)).isEmpty();
+    }
+
+    @Test
+    void blankToken_behavesLikeNoAuth() {
+        var client = new HttpFederationPeerClient(List.of(), RestClient.create(), "  ");
+        assertThat(client.queryPeers(QUERY)).isEmpty();
+    }
 }

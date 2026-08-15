@@ -6,6 +6,7 @@ import com.suplab.aether.memory.domain.FederationQuery;
 import com.suplab.aether.memory.domain.MemoryType;
 import com.suplab.aether.memory.ports.FederationAuditStore;
 import com.suplab.aether.memory.ports.FederationRateLimiter;
+import com.suplab.aether.memory.api.security.FederationAuthenticator;
 import com.suplab.aether.memory.ports.MemoryFederationPort;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
@@ -43,14 +44,22 @@ class MemoryFederationControllerTest {
         }
     }
 
+    // Auth disabled — the default standalone posture.
+    private static final FederationAuthenticator NO_AUTH = new FederationAuthenticator(false, "");
+
     private MemoryFederationController controller(boolean allow, FakeFederation fed) {
-        return new MemoryFederationController(fed, new FixedLimiter(allow), new FakeAudit());
+        return new MemoryFederationController(fed, new FixedLimiter(allow), new FakeAudit(), NO_AUTH);
+    }
+
+    private MemoryFederationController controller(boolean allow, FakeFederation fed,
+                                                 FederationAuthenticator auth) {
+        return new MemoryFederationController(fed, new FixedLimiter(allow), new FakeAudit(), auth);
     }
 
     @Test
     void query_returnsProjectionsWhenWithinBudget() {
         var res = controller(true, new FakeFederation())
-                .query(Map.of("originTenantId", "tenant-c", "queryText", "insight"));
+                .query(null, Map.of("originTenantId", "tenant-c", "queryText", "insight"));
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat((List<?>) res.getBody()).hasSize(1);
     }
@@ -58,24 +67,42 @@ class MemoryFederationControllerTest {
     @Test
     void query_returns429WhenRateLimited() {
         var res = controller(false, new FakeFederation())
-                .query(Map.of("originTenantId", "tenant-c", "queryText", "insight"));
+                .query(null, Map.of("originTenantId", "tenant-c", "queryText", "insight"));
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.TOO_MANY_REQUESTS);
     }
 
     @Test
     void query_missingFieldsAreBadRequest() {
         var c = controller(true, new FakeFederation());
-        assertThat(c.query(Map.of("queryText", "x")).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(c.query(Map.of("originTenantId", "t")).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(c.query(null, Map.of("queryText", "x")).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(c.query(null, Map.of("originTenantId", "t")).getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test
     void query_includePeersRoutesToFanout() {
         var fed = new FakeFederation();
         var res = controller(true, fed)
-                .query(Map.of("originTenantId", "tenant-c", "queryText", "insight", "includePeers", true));
+                .query(null, Map.of("originTenantId", "tenant-c", "queryText", "insight", "includePeers", true));
         assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(fed.fanoutCalled).isTrue();
+    }
+
+    @Test
+    void query_requireAuth_rejectsMissingOrWrongToken() {
+        var auth = new FederationAuthenticator(true, "s3cret");
+        var c = controller(true, new FakeFederation(), auth);
+        var body = Map.<String, Object>of("originTenantId", "tenant-c", "queryText", "insight");
+
+        assertThat(c.query(null, body).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+        assertThat(c.query("Bearer wrong", body).getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void query_requireAuth_acceptsCorrectToken() {
+        var auth = new FederationAuthenticator(true, "s3cret");
+        var res = controller(true, new FakeFederation(), auth)
+                .query("Bearer s3cret", Map.of("originTenantId", "tenant-c", "queryText", "insight"));
+        assertThat(res.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     @Test
