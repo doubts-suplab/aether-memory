@@ -106,7 +106,22 @@ outbound reach the roadmap's "hardening" goal calls for.
   merges local + peers by strength; `"includePeers": true` on `/federation/query` triggers it.
   Config: `aether.memory.federation.peers` (comma-separated; empty = standalone).
 
-**Tests — 76 unit tests green:**
+**Per-peer federation auth (session 2):**
+- `FederationAuthenticator` (memory-api) — a config-gated, **fail-closed** inbound gate: when
+  `aether.memory.federation.require-auth=true`, `/federation/query` requires
+  `Authorization: Bearer <aether.memory.federation.auth-token>` (constant-time compare) or returns
+  **401** (checked before rate limiting, so an unauthenticated caller learns nothing). Off by default —
+  Memory still runs open standalone; requiring auth with no token configured fails construction.
+- Outbound: `HttpFederationPeerClient` attaches `Authorization: Bearer <peer-auth-token>` to each peer
+  request when configured, so an authenticated peer accepts the fan-out. No migration — auth is a
+  request-time concern over existing state.
+
+**Tests — 83 unit tests green (was 76):**
+- `FederationAuthenticatorTest` (3): open when not required, matching-token-only when required,
+  fail-closed on missing token. Controller 401 (missing/wrong token) + 200 (correct token). Peer-client
+  token cases (best-effort tolerated).
+
+**Tests — earlier (Phase 2 session 1) — 76 unit tests green:**
 - Domain `FederationAuditEventTest`, `FederatedMemoryTest` redaction cases; engine
   `DefaultMemoryFederationServiceTest` (redaction-per-owner, audit recorded, fan-out merge),
   `InMemoryFederationRateLimiterTest` (per-origin window reset), `HttpFederationPeerClientTest`
@@ -116,6 +131,7 @@ outbound reach the roadmap's "hardening" goal calls for.
 
 ### Remaining Phase 2 (follow-up)
 - **Distributed (shared) rate limiter** across instances (the in-memory limiter is per-node).
+  (Per-peer federation auth — ✅ delivered above.)
 - **Per-peer authentication / mutual trust** on outbound federation.
 
 ---

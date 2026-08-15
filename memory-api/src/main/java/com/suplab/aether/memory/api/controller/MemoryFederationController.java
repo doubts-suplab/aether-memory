@@ -4,6 +4,7 @@ import com.suplab.aether.memory.domain.FederationQuery;
 import com.suplab.aether.memory.domain.MemoryType;
 import com.suplab.aether.memory.ports.FederationAuditStore;
 import com.suplab.aether.memory.ports.FederationRateLimiter;
+import com.suplab.aether.memory.api.security.FederationAuthenticator;
 import com.suplab.aether.memory.ports.MemoryFederationPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,13 +41,16 @@ public class MemoryFederationController {
     private final MemoryFederationPort federationPort;
     private final FederationRateLimiter rateLimiter;
     private final FederationAuditStore auditStore;
+    private final FederationAuthenticator authenticator;
 
     public MemoryFederationController(MemoryFederationPort federationPort,
                                       FederationRateLimiter rateLimiter,
-                                      FederationAuditStore auditStore) {
+                                      FederationAuditStore auditStore,
+                                      FederationAuthenticator authenticator) {
         this.federationPort = federationPort;
         this.rateLimiter = rateLimiter;
         this.auditStore = auditStore;
+        this.authenticator = authenticator;
     }
 
     /**
@@ -54,10 +59,20 @@ public class MemoryFederationController {
      * <p>Request body: {@code {"originTenantId": "...", "queryText": "...", "type": "SEMANTIC",
      * "limit": 10, "includePeers": false}}.</p>
      *
-     * @return 200 OK with the projections; 400 on missing fields; 429 when the origin is rate-limited
+     * @return 200 OK with the projections; 401 when auth is required and the token is missing/invalid;
+     *         400 on missing fields; 429 when the origin is rate-limited
      */
     @PostMapping("/query")
-    public ResponseEntity<Object> query(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<Object> query(
+            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorization,
+            @RequestBody Map<String, Object> body) {
+        // Peer authentication first — an unauthenticated caller learns nothing (not even rate state).
+        if (!authenticator.isAuthorized(authorization)) {
+            log.warn("Federation query rejected — missing or invalid bearer token");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "federation authentication required"));
+        }
+
         var originTenantId = asString(body.get("originTenantId"));
         var queryText = asString(body.get("queryText"));
         if (originTenantId == null || originTenantId.isBlank()) {

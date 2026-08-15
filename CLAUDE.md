@@ -19,7 +19,7 @@
 
 **Capability owned (exclusively):** *Shared Memory* — Team Memory, Shared Reinforcement, Memory Federation API, Configurable Policies. Personal memory remains owned by Aether Core; Memory does not duplicate it.
 
-**Current status:** Phase 1 — Shared Memory Engine ✅ complete. Phase 2 — Federation hardening 🔄 core complete: an **append-only federation audit log** (`GET /federation/audit`), **per-origin rate limiting** on `/federation/query` (429 when exceeded), **per-tenant redaction depth** (`MemoryPolicy.federationSummaryChars` — each tenant controls how much of its content may leak), and an **outbound peer client** (`includePeers` fan-out to configured peer instances, gated by config); Testcontainers ITs. Follow-up: distributed (shared) rate limiter, per-peer auth.
+**Current status:** Phase 1 — Shared Memory Engine ✅ complete. Phase 2 — Federation hardening 🔄 core complete: an **append-only federation audit log** (`GET /federation/audit`), **per-origin rate limiting** on `/federation/query` (429 when exceeded), **per-tenant redaction depth** (`MemoryPolicy.federationSummaryChars` — each tenant controls how much of its content may leak), an **outbound peer client** (`includePeers` fan-out to configured peer instances, gated by config), and **per-peer federation auth** — a config-gated, fail-closed inbound bearer-token gate on `/federation/query` (`FederationAuthenticator`, 401 when required and missing/invalid) plus an outbound bearer token on the peer client; Testcontainers ITs. Follow-up: distributed (shared) rate limiter.
 
 **One runnable application:**
 - `memory-api` — Shared Memory Platform API (port 8083)
