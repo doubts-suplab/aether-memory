@@ -93,8 +93,11 @@ Aether Memory owns the **Shared Memory** capability exclusively. Personal memory
 | `MEMORY_DECAY_ENABLED` | `true` | Toggle the scheduled decay/archive lifecycle |
 | `MEMORY_DECAY_RATE` | `0.01` | Default strength lost per idle day (tenants may override) |
 | `MEMORY_ARCHIVE_THRESHOLD` | `0.1` | Default archive cutoff strength (tenants may override) |
-| `aether.memory.federation.rate-limit.max-per-window` | `60` | Max federation queries per origin per window |
-| `aether.memory.federation.rate-limit.window-seconds` | `60` | Rate-limit window length (seconds) |
+| `FEDERATION_RATE_LIMIT_MAX` | `60` | Max federation queries per origin per window |
+| `FEDERATION_RATE_LIMIT_WINDOW_SECONDS` | `60` | Rate-limit window length (seconds) |
+| `FEDERATION_RATE_LIMIT_BACKEND` | `memory` | `memory` (per-instance) or `redis` (shared across the fleet; degrades to per-node if Redis is down) |
+| `REDIS_HOST` | `localhost` | Redis host — only used when the rate-limit backend is `redis` |
+| `REDIS_PORT` | `6379` | Redis port — only used when the rate-limit backend is `redis` |
 | `aether.memory.federation.peers` | _(empty)_ | Comma-separated peer base URLs for outbound fan-out (empty = local-only) |
 | `FEDERATION_REQUIRE_AUTH` | `false` | Require a bearer token on inbound `/federation/query` (fail-closed: needs `FEDERATION_AUTH_TOKEN`) |
 | `FEDERATION_AUTH_TOKEN` | _(empty)_ | Shared inbound token peers must present as `Authorization: Bearer …` |

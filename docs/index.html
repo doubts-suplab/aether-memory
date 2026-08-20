@@ -226,7 +226,7 @@
   <div class="roadmap">
     <div class="roadmap-item"><span class="dot done"></span><span class="phase-label">P0</span><span class="phase-name">Scaffold</span><span class="status-badge done">Complete</span></div>
     <div class="roadmap-item"><span class="dot done"></span><span class="phase-label">P1</span><span class="phase-name">Shared Memory Engine</span><span class="status-badge done">Complete</span></div>
-    <div class="roadmap-item"><span class="dot done"></span><span class="phase-label">P2</span><span class="phase-name">Federation hardening — audit log, per-origin rate limiting, per-tenant redaction depth, outbound peer fan-out, and per-peer bearer auth (config-gated, fail-closed)</span><span class="status-badge done">Core Complete</span></div>
+    <div class="roadmap-item"><span class="dot done"></span><span class="phase-label">P2</span><span class="phase-name">Federation hardening — audit log, per-origin rate limiting (in-memory or shared Redis, per-node fallback), per-tenant redaction depth, outbound peer fan-out, and per-peer bearer auth (config-gated, fail-closed)</span><span class="status-badge done">Core Complete</span></div>
     <div class="roadmap-item"><span class="dot planned"></span><span class="phase-label">P3</span><span class="phase-name">Governance &amp; Policy</span><span class="status-badge planned">Planned</span></div>
     <div class="roadmap-item"><span class="dot planned"></span><span class="phase-label">P4</span><span class="phase-name">Kubernetes + Helm</span><span class="status-badge planned">Planned</span></div>
   </div>
@@ -243,6 +243,7 @@
     <div class="tech-row"><span class="layer">Database</span><span class="value">PostgreSQL 16</span></div>
     <div class="tech-row"><span class="layer">Vector Store</span><span class="value">pgvector (384-dim)</span></div>
     <div class="tech-row"><span class="layer">Embedding</span><span class="value">all-MiniLM-L6-v2 · Ollama</span></div>
+    <div class="tech-row"><span class="layer">Rate limiting</span><span class="value">In-memory · Redis (optional, shared)</span></div>
     <div class="tech-row"><span class="layer">Migrations</span><span class="value">Flyway</span></div>
     <div class="tech-row"><span class="layer">Metrics</span><span class="value">Micrometer · Prometheus</span></div>
     <div class="tech-row"><span class="layer">Build</span><span class="value">Maven multi-module</span></div>

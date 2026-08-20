@@ -3,9 +3,11 @@ package com.suplab.aether.memory.api.config;
 import com.suplab.aether.memory.engine.embedding.SharedEmbeddingService;
 import com.suplab.aether.memory.engine.federation.DefaultMemoryFederationService;
 import com.suplab.aether.memory.api.security.FederationAuthenticator;
+import com.suplab.aether.memory.api.federation.RedisDistributedRateLimitStore;
 import com.suplab.aether.memory.engine.federation.HttpFederationPeerClient;
 import com.suplab.aether.memory.engine.federation.InMemoryFederationRateLimiter;
 import com.suplab.aether.memory.engine.federation.JdbcFederationAuditStore;
+import com.suplab.aether.memory.engine.federation.RedisFederationRateLimiter;
 import com.suplab.aether.memory.engine.lifecycle.PolicyAwareMemoryLifecycleService;
 import com.suplab.aether.memory.engine.policy.JdbcMemoryPolicyStore;
 import com.suplab.aether.memory.engine.store.PGVectorSharedMemoryStore;
@@ -16,10 +18,12 @@ import com.suplab.aether.memory.ports.MemoryFederationPort;
 import com.suplab.aether.memory.ports.MemoryLifecyclePort;
 import com.suplab.aether.memory.ports.MemoryPolicyStore;
 import com.suplab.aether.memory.ports.SharedMemoryStore;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.web.client.RestClient;
 
@@ -64,16 +68,34 @@ public class MemoryApiConfig {
     }
 
     /**
-     * Creates the per-origin federation rate limiter (in-memory fixed window).
+     * Creates the per-origin federation rate limiter. The backend is selected by
+     * {@code aether.memory.federation.rate-limit.backend}: {@code memory} (default — a per-instance
+     * fixed window) or {@code redis} (a <em>shared</em> fixed window across every instance, so an
+     * origin's budget is enforced fleet-wide). The Redis limiter degrades to a per-node in-memory
+     * limiter if Redis is unreachable, so a cache outage weakens throttling rather than removing it or
+     * blocking federation. Selecting {@code redis} needs a {@link StringRedisTemplate} (Spring Data
+     * Redis, configured via {@code spring.data.redis.*}); if none is present it falls back to memory.
      *
      * @param maxPerWindow  maximum federation queries per origin per window (default 60)
      * @param windowSeconds window length in seconds (default 60)
+     * @param backend       {@code memory} or {@code redis}
+     * @param redisTemplate the Redis template (optional — absent unless the Redis starter is wired)
      */
     @Bean
     public FederationRateLimiter federationRateLimiter(
             @Value("${aether.memory.federation.rate-limit.max-per-window:60}") int maxPerWindow,
-            @Value("${aether.memory.federation.rate-limit.window-seconds:60}") int windowSeconds) {
-        return new InMemoryFederationRateLimiter(maxPerWindow, windowSeconds);
+            @Value("${aether.memory.federation.rate-limit.window-seconds:60}") int windowSeconds,
+            @Value("${aether.memory.federation.rate-limit.backend:memory}") String backend,
+            ObjectProvider<StringRedisTemplate> redisTemplate) {
+        var local = new InMemoryFederationRateLimiter(maxPerWindow, windowSeconds);
+        if ("redis".equalsIgnoreCase(backend)) {
+            var template = redisTemplate.getIfAvailable();
+            if (template != null) {
+                var store = new RedisDistributedRateLimitStore(template);
+                return new RedisFederationRateLimiter(store, maxPerWindow, windowSeconds, local);
+            }
+        }
+        return local;
     }
 
     /**

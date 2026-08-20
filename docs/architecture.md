@@ -65,7 +65,8 @@ FederationAuditEvent = (originTenantId, type?, queryLabel≤120, resultCount, oc
 | `MemoryPolicyStore` | `JdbcMemoryPolicyStore` | Resolve/save per-tenant policy (defaults when unset), incl. redaction depth |
 | `MemoryFederationPort` | `DefaultMemoryFederationService` | Privacy-preserving cross-instance query + peer fan-out; per-owner redaction; audits every query |
 | `FederationAuditStore` | `JdbcFederationAuditStore` | Append-only log of served federation queries |
-| `FederationRateLimiter` | `InMemoryFederationRateLimiter` | Per-origin fixed-window throttle on `/federation/query` |
+| `FederationRateLimiter` | `InMemoryFederationRateLimiter` (default) / `RedisFederationRateLimiter` | Per-origin fixed-window throttle on `/federation/query`; the Redis backend shares one window across the fleet (via `DistributedRateLimitStore`) and degrades to per-node on Redis failure |
+| `DistributedRateLimitStore` | `RedisDistributedRateLimitStore` | Atomic increment+expiry primitive (Redis `INCR`+`EXPIRE`) backing the distributed limiter |
 | `FederationPeerClient` | `HttpFederationPeerClient` | Outbound fan-out to configured peer instances (optional; gated by config); attaches an outbound bearer token when configured |
 | `FederationAuthenticator` | (memory-api) | Inbound per-peer bearer-token gate on `/federation/query` — config-gated, fail-closed, constant-time compare |
 | `MemoryLifecyclePort` | `PolicyAwareMemoryLifecycleService` | Per-tenant decay + archive |
@@ -96,7 +97,7 @@ All embeddings are 384-dim (all-MiniLM-L6-v2), consistent across the ecosystem.
 
 ### 5.2 Federation (privacy-preserving, hardened)
 0. `POST /api/v1/federation/query` → **peer authentication first** (`FederationAuthenticator`): when `aether.memory.federation.require-auth=true`, a missing/invalid `Authorization: Bearer <token>` gets `401` before anything else runs — an unauthenticated caller learns nothing, not even rate state. Off by default so Memory runs open standalone; requiring auth with no token configured fails construction (fail-closed). The peer client attaches the matching outbound token on fan-out.
-1. `POST /api/v1/federation/query` → the origin is **rate-limited** (`FederationRateLimiter`, per-origin fixed window); an over-budget origin gets `429` + `Retry-After`.
+1. `POST /api/v1/federation/query` → the origin is **rate-limited** (`FederationRateLimiter`, per-origin fixed window); an over-budget origin gets `429` + `Retry-After`. The backend is config-selected: `memory` (per-instance) or `redis` — a shared fixed window (`fedrl:<origin>:<bucket>` counted with `INCR`+`EXPIRE`) so an origin's budget holds across every instance, degrading to the per-node limiter if Redis is unreachable.
 2. `DefaultMemoryFederationService` embeds `queryText`; `SharedMemoryStore.findFederatable` joins `memory_policies` and returns only `FEDERATED` rows in `federation_enabled` tenants.
 3. Each candidate is projected to `FederatedMemory` at its **owning tenant's redaction depth** (`MemoryPolicy.federationSummaryChars` — 0 = fully redacted), coarse provenance = source tenant, count clamped to `MAX_FEDERATION_LIMIT`. Team/contributor identity never crosses the boundary.
 4. The served query is written to the append-only `federation_audit` (origin, type, bounded query label, result count) — surfaced by `GET /federation/audit`.
