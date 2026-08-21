@@ -8,6 +8,11 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  # Redis — only used when aether.memory.federation.rate-limit.backend=redis (connection is lazy).
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 server:
   port: ${SERVER_PORT:8083}
@@ -42,3 +47,9 @@ aether:
       auth-token: ${FEDERATION_AUTH_TOKEN:}
       # Outbound bearer token sent to configured peers so an authenticated peer accepts the fan-out.
       peer-auth-token: ${FEDERATION_PEER_AUTH_TOKEN:}
+      rate-limit:
+        # 'memory' (per-instance, default) or 'redis' (shared fixed window across the fleet; degrades
+        # to per-node if Redis is unreachable). 'redis' uses spring.data.redis.* for the connection.
+        backend: ${FEDERATION_RATE_LIMIT_BACKEND:memory}
+        max-per-window: ${FEDERATION_RATE_LIMIT_MAX:60}
+        window-seconds: ${FEDERATION_RATE_LIMIT_WINDOW_SECONDS:60}

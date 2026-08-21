@@ -42,7 +42,7 @@
 
 ---
 
-## Phase 2 — Federation 🔄 (core complete)
+## Phase 2 — Federation ✅ (core complete)
 
 **Goal:** Cross-instance federation hardened — outbound federation adapter, rate limiting, and audit.
 
@@ -52,7 +52,7 @@
 | Federation audit log (append-only `federation_audit`, `GET /federation/audit`) | ✅ |
 | Per-origin rate limiting on `/federation/query` (429 + `Retry-After`) | ✅ |
 | Configurable redaction depth per tenant (`MemoryPolicy.federationSummaryChars`) | ✅ |
-| Distributed (shared) rate limiter across instances | ⏳ (follow-up) |
+| Distributed (shared) rate limiter across instances — `RedisFederationRateLimiter` over `DistributedRateLimitStore` (`INCR`+`EXPIRE`), config-selected, per-node fallback on Redis failure | ✅ |
 | Per-peer authentication / mutual trust on outbound federation | ⏳ (follow-up) |
 
 ---
@@ -92,7 +92,7 @@
 |---|---|
 | Federation robustness — failure handling, consistency, richer projection *(partly addressed in Phase 2: audit + rate-limit + peer fan-out)* | M |
 | Per-peer federation auth — inbound bearer-token gate on `/federation/query` + outbound token on the peer client (config-gated, fail-closed) | ✅ |
-| Distributed (shared) rate limiter *(Phase 2 follow-up)* | M–L |
+| Distributed (shared) rate limiter *(Phase 2 follow-up — ✅ delivered: Redis backend, per-node fallback)* | M–L |
 | Multi-team / multi-org memory graphs | M–L |
 | Richer policy language | M |
 | Shared-reinforcement performance under concurrent access | M |

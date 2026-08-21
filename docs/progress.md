@@ -5,13 +5,13 @@
 
 ---
 
-**Active Phase:** Phase 2 — Federation hardening 🔄 (core complete: audit + per-origin rate limiting + per-tenant redaction depth + outbound peer fan-out)
+**Active Phase:** Phase 2 — Federation hardening ✅ core complete (audit + per-origin rate limiting + per-tenant redaction depth + outbound peer fan-out + per-peer auth + distributed rate limiter)
 
 | Phase | Name | Status | Sessions |
 |---|---|---|---|
 | 0 | Scaffold | ✅ Complete | 1 |
 | 1 | Shared Memory Engine | ✅ Complete | 2 |
-| 2 | Federation | 🔄 Core complete (audit + rate-limit + redaction + peer fan-out) | 3 |
+| 2 | Federation | ✅ Core complete (audit + rate-limit + redaction + peer fan-out + peer auth + distributed limiter) | 4 |
 | 3 | Governance & Policy | ⏳ Planned | — |
 | 4 | Kubernetes + Helm | ⏳ Planned | — |
 
@@ -73,6 +73,45 @@
 
 ---
 
+## Phase 2 — Federation hardening ✅ (session 4 — distributed rate limiter)
+
+**Commit:** `feat(federation): distributed (Redis) per-origin rate limiter with per-node fallback`
+
+The per-origin limiter was per-instance: N nodes meant an origin effectively got N× its budget. This
+session adds the shared limiter the roadmap's remaining follow-up called for — and closes Phase 2.
+
+### What was done
+
+**Distributed fixed-window limiter (behind the same port):**
+- `DistributedRateLimitStore` port (memory-domain) — the one primitive a cross-instance limiter needs:
+  an atomic `incrementAndExpire(key, ttl)` (a Redis `INCR`+`EXPIRE`). Framework-free, so the limiter
+  logic is unit-tested against a fake.
+- `RedisFederationRateLimiter` (memory-engine) — keys each origin's budget by a tumbling window bucket
+  (`fedrl:<origin>:<bucket>`) and counts in the shared store, so an origin's budget is enforced
+  fleet-wide. **Fail-safe**: if the store is unreachable it degrades to an injected per-node
+  `InMemoryFederationRateLimiter` rather than failing open (no throttling) or closed (all federation
+  blocked) — throttling weakens to per-instance until Redis recovers.
+- `RedisDistributedRateLimitStore` (memory-api) — the Redis adapter (`StringRedisTemplate`, `INCR` then
+  `EXPIRE` on the first hit). `spring-boot-starter-data-redis` added; the connection is lazy, so nothing
+  connects unless the backend is actually `redis`.
+
+**Config-selected backend:**
+- `aether.memory.federation.rate-limit.backend` = `memory` (default) | `redis`. The `federationRateLimiter`
+  bean builds the Redis limiter (with the in-memory one as fallback) when `redis` is chosen and a
+  `StringRedisTemplate` is available, else the in-memory limiter. Redis host/port from
+  `spring.data.redis.*` (`REDIS_HOST`/`REDIS_PORT`) — no secrets in source.
+
+**Tests — 90 unit tests green (was 84):**
+- `RedisFederationRateLimiterTest` (6): admit-up-to-max then reject, window reset via injected clock,
+  per-origin isolation, **store-failure → local fallback consulted**, config accessors, null guards.
+- No new migration — rate limiting is a request-time concern.
+
+### Phase 2 complete
+All Phase 2 deliverables and follow-ups are done: audit log, per-origin rate limiting (now **distributed**),
+per-tenant redaction depth, outbound peer fan-out, per-peer auth, and the shared rate limiter.
+
+---
+
 ## Phase 2 — Federation hardening 🔄 (session 3)
 
 **Commit:** `feat(memory): federation hardening — audit, per-origin rate limiting, redaction depth, peer fan-out (V005)`
@@ -130,9 +169,9 @@ outbound reach the roadmap's "hardening" goal calls for.
 - `mvn -DskipITs verify` passes the JaCoCo 80% gate.
 
 ### Remaining Phase 2 (follow-up)
-- **Distributed (shared) rate limiter** across instances (the in-memory limiter is per-node).
-  (Per-peer federation auth — ✅ delivered above.)
-- **Per-peer authentication / mutual trust** on outbound federation.
+- **Distributed (shared) rate limiter** across instances — ✅ delivered (session 4, Redis backend with
+  per-node fallback).
+- **Per-peer authentication / mutual trust** on outbound federation — ✅ delivered (per-peer auth).
 
 ---
 
