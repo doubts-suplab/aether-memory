@@ -104,7 +104,7 @@
   <p class="hero-sub">Shared team and organisational memory — collective cognition, per-tenant governance, and privacy-preserving federation across instances.</p>
   <div class="badges">
     <span class="badge green">Phase 1 — Shared Memory Engine ✅</span>
-    <span class="badge accent">Phase 2 — Federation hardening (core)</span>
+    <span class="badge accent">Phase 3 — Governance &amp; Policy (core)</span>
     <span class="badge">Java 21</span>
     <span class="badge">Spring Boot 3.3</span>
     <span class="badge">pgvector</span>
@@ -211,6 +211,8 @@
         <tr><td><span class="method post">POST</span></td><td><code>/api/v1/tenants/{t}/teams/{team}/memories/{id}/contribute</code></td><td>Record a distinct contributor (shared reinforcement)</td></tr>
         <tr><td><span class="method get">GET</span></td><td><code>/api/v1/tenants/{t}/teams/{team}/memories/count</code></td><td>Active memory count</td></tr>
         <tr><td><span class="method delete">DEL</span></td><td><code>/api/v1/tenants/{t}/teams/{team}/memories/{id}</code></td><td>Delete a memory</td></tr>
+        <tr><td><span class="method delete">DEL</span></td><td><code>/api/v1/tenants/{t}/teams/{team}/memories</code></td><td>Right-to-erasure — erase a team's active + archived memories (GDPR Art. 17)</td></tr>
+        <tr><td><span class="method get">GET</span></td><td><code>/api/v1/tenants/{t}/teams/{team}/memories/export</code></td><td>Data-portability export — non-reinforcing snapshot, active + archive (GDPR Art. 20)</td></tr>
         <tr><td><span class="method post">POST</span></td><td><code>/api/v1/federation/query</code></td><td>Privacy-preserving cross-instance query</td></tr>
         <tr><td><span class="method put">PUT</span></td><td><code>/api/v1/tenants/{t}/memory-policy</code></td><td>Replace a tenant's governance policy</td></tr>
       </tbody>
@@ -227,7 +229,7 @@
     <div class="roadmap-item"><span class="dot done"></span><span class="phase-label">P0</span><span class="phase-name">Scaffold</span><span class="status-badge done">Complete</span></div>
     <div class="roadmap-item"><span class="dot done"></span><span class="phase-label">P1</span><span class="phase-name">Shared Memory Engine</span><span class="status-badge done">Complete</span></div>
     <div class="roadmap-item"><span class="dot done"></span><span class="phase-label">P2</span><span class="phase-name">Federation hardening — audit log, per-origin rate limiting (in-memory or shared Redis, per-node fallback), per-tenant redaction depth, outbound peer fan-out, and per-peer bearer auth (config-gated, fail-closed)</span><span class="status-badge done">Core Complete</span></div>
-    <div class="roadmap-item"><span class="dot planned"></span><span class="phase-label">P3</span><span class="phase-name">Governance &amp; Policy</span><span class="status-badge planned">Planned</span></div>
+    <div class="roadmap-item"><span class="dot done"></span><span class="phase-label">P3</span><span class="phase-name">Governance &amp; Policy — retention-window purge of archived memories, GDPR team erasure across active + archive, and a non-reinforcing bulk export; policy change-audit follow-up</span><span class="status-badge done">Core Complete</span></div>
     <div class="roadmap-item"><span class="dot planned"></span><span class="phase-label">P4</span><span class="phase-name">Kubernetes + Helm</span><span class="status-badge planned">Planned</span></div>
   </div>
 </section>

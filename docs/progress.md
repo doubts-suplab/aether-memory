@@ -5,17 +5,57 @@
 
 ---
 
-**Active Phase:** Phase 2 — Federation hardening ✅ core complete (audit + per-origin rate limiting + per-tenant redaction depth + outbound peer fan-out + per-peer auth + distributed rate limiter)
+**Active Phase:** Phase 3 — Governance & Policy 🔄 core complete (retention-window purge of archived memories + GDPR team erasure across active+archive + non-reinforcing bulk export; policy change-audit follow-up)
 
 | Phase | Name | Status | Sessions |
 |---|---|---|---|
 | 0 | Scaffold | ✅ Complete | 1 |
 | 1 | Shared Memory Engine | ✅ Complete | 2 |
 | 2 | Federation | ✅ Core complete (audit + rate-limit + redaction + peer fan-out + peer auth + distributed limiter) | 4 |
-| 3 | Governance & Policy | ⏳ Planned | — |
+| 3 | Governance & Policy | 🔄 Core complete (retention purge + GDPR erasure + bulk export; policy-audit follow-up) | 5 |
 | 4 | Kubernetes + Helm | ⏳ Planned | — |
 
 ---
+
+## Phase 3 — Governance & Policy 🔄 (session 5 — retention purge + GDPR erasure + bulk export)
+
+**Commit:** `feat(memory): retention purge, GDPR team erasure, and non-reinforcing bulk export`
+
+Phase 2 hardened federation. Phase 3 governs the memory lifecycle end to end: archived memories are
+purged past retention, a team's memories can be erased or exported on a data-subject request.
+
+### What was done
+
+**Retention-window purge (storage limitation):**
+- `PolicyAwareMemoryLifecycleService` gains a third step, `purge()`: a single set-based `DELETE` of
+  archived memories whose `archived_at` is older than the tenant's `retention_days` (per-tenant
+  `COALESCE`, global default fallback) — the only lifecycle step that permanently deletes.
+- `LifecycleResult` gains `purgedCount`; the scheduler publishes `aether.memory.shared.purged`.
+
+**GDPR team erasure (Art. 17):**
+- `MemoryErasureResult` + `MemoryErasurePort`; `JdbcMemoryErasureService` deletes a team's rows from
+  **both** `shared_memories` and `shared_memories_archive`, tenant+team-scoped, idempotent, reporting
+  the counts removed from each.
+- `DELETE /api/v1/tenants/{tenantId}/teams/{teamId}/memories` — 200 with counts.
+
+**Bulk export (Art. 20 portability):**
+- `ExportedMemory` + `MemoryExport` + `MemoryExportPort`; `JdbcMemoryExportService` reads a team's
+  active + archived rows with plain explicit-column `SELECT`s — **non-reinforcing** (never touches
+  strength or access counts), embedding excluded (internal artefact, not portable data).
+- `GET /api/v1/tenants/{tenantId}/teams/{teamId}/memories/export`.
+
+**Policy validation + change audit** remains the Phase 3 follow-up (`MemoryPolicy` already validates
+on construction; an append-only policy-change audit log is the missing piece).
+
+### Constraints upheld
+- Every new statement scoped by `tenant_id` + `team_id` — no cross-team read or delete path.
+- Export never reinforces; erasure spans both tables so faded memories are not overlooked.
+- Explicit column lists, parameterized queries throughout.
+
+### Verification
+- `mvn -DskipITs verify` green with the JaCoCo 80% gate; unit tests for the governance projections
+  and controller, updated lifecycle scheduler metrics. New Testcontainers ITs cover erasure + export
+  across active/archive and the retention purge.
 
 ## Phase 0 — Scaffold ✅
 

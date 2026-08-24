@@ -11,11 +11,12 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
  * parameters <em>per tenant</em>.
  *
  * <p>Each statement {@code LEFT JOIN}s {@code memory_policies} and uses {@code COALESCE} to fall
- * back to the injected default constants for tenants with no configured policy. Both steps run
+ * back to the injected default constants for tenants with no configured policy. All steps run
  * as single SQL statements — no per-row round trips — so a run over millions of memories stays
  * cheap. The archive step uses a data-modifying CTE ({@code WITH moved AS (DELETE ... RETURNING
  * ...) INSERT ...}) so move-to-archive is atomic: a memory is never deleted without landing in
- * the archive, and never duplicated.</p>
+ * the archive, and never duplicated. The retention purge is the only step that permanently deletes —
+ * archived memories past their tenant's retention window (storage-limitation enforcement).</p>
  */
 public class PolicyAwareMemoryLifecycleService implements MemoryLifecyclePort {
 
@@ -25,30 +26,50 @@ public class PolicyAwareMemoryLifecycleService implements MemoryLifecyclePort {
     private final double defaultDecayRate;
     private final int defaultDecayAfterDays;
     private final double defaultArchiveThreshold;
+    private final int defaultRetentionDays;
 
     /**
      * @param defaultDecayRate        strength lost per idle day for tenants without a policy
      * @param defaultDecayAfterDays   grace period for tenants without a policy
      * @param defaultArchiveThreshold archive cutoff for tenants without a policy
+     * @param defaultRetentionDays    archive retention window for tenants without a policy
      */
     public PolicyAwareMemoryLifecycleService(NamedParameterJdbcTemplate jdbc,
                                              double defaultDecayRate,
                                              int defaultDecayAfterDays,
-                                             double defaultArchiveThreshold) {
+                                             double defaultArchiveThreshold,
+                                             int defaultRetentionDays) {
         this.jdbc = jdbc;
         this.defaultDecayRate = defaultDecayRate;
         this.defaultDecayAfterDays = defaultDecayAfterDays;
         this.defaultArchiveThreshold = defaultArchiveThreshold;
+        this.defaultRetentionDays = defaultRetentionDays;
     }
 
     @Override
     public LifecycleResult runLifecycle() {
         long decayed = decay();
         long archived = archive();
+        long purged = purge();
         long remaining = countActive();
-        log.info("Shared-memory lifecycle run complete: decayed={} archived={} totalRemaining={}",
-                decayed, archived, remaining);
-        return new LifecycleResult(decayed, archived, remaining);
+        log.info("Shared-memory lifecycle run complete: decayed={} archived={} purged={} totalRemaining={}",
+                decayed, archived, purged, remaining);
+        return new LifecycleResult(decayed, archived, purged, remaining);
+    }
+
+    private long purge() {
+        // Storage limitation: permanently delete archived memories older than the tenant's retention
+        // window (per-tenant policy, COALESCE default). The only lifecycle step that deletes.
+        var sql = """
+                DELETE FROM shared_memories_archive a
+                USING shared_memories_archive tgt
+                LEFT JOIN memory_policies mp ON mp.tenant_id = tgt.tenant_id
+                WHERE a.id = tgt.id
+                  AND tgt.archived_at
+                        < NOW() - make_interval(days => COALESCE(mp.retention_days, :defaultRetentionDays))
+                """;
+        var params = new MapSqlParameterSource("defaultRetentionDays", defaultRetentionDays);
+        return jdbc.update(sql, params);
     }
 
     private long decay() {

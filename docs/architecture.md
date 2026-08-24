@@ -69,7 +69,9 @@ FederationAuditEvent = (originTenantId, type?, queryLabel≤120, resultCount, oc
 | `DistributedRateLimitStore` | `RedisDistributedRateLimitStore` | Atomic increment+expiry primitive (Redis `INCR`+`EXPIRE`) backing the distributed limiter |
 | `FederationPeerClient` | `HttpFederationPeerClient` | Outbound fan-out to configured peer instances (optional; gated by config); attaches an outbound bearer token when configured |
 | `FederationAuthenticator` | (memory-api) | Inbound per-peer bearer-token gate on `/federation/query` — config-gated, fail-closed, constant-time compare |
-| `MemoryLifecyclePort` | `PolicyAwareMemoryLifecycleService` | Per-tenant decay + archive |
+| `MemoryLifecyclePort` | `PolicyAwareMemoryLifecycleService` | Per-tenant decay + archive + retention purge of archived memories past the tenant's window |
+| `MemoryErasurePort` | `JdbcMemoryErasureService` | Right-to-erasure (GDPR Art. 17) — deletes a team's active + archived memories, tenant+team-scoped, idempotent, reports counts |
+| `MemoryExportPort` | `JdbcMemoryExportService` | Data-portability export (GDPR Art. 20) — a read-only, non-reinforcing snapshot of a team's active + archived memories (embedding excluded) |
 
 ---
 
@@ -104,10 +106,15 @@ All embeddings are 384-dim (all-MiniLM-L6-v2), consistent across the ecosystem.
 5. With `"includePeers": true`, `federatedFanout` also queries every configured peer via `HttpFederationPeerClient`, merges by strength, and re-clamps. Peer failures are tolerated (skipped); with no peers configured it is local-only, so Memory runs standalone.
 
 ### 5.3 Lifecycle (per-tenant, set-based)
-1. Scheduler (`@Scheduled`, default 03:00) → `MemoryLifecyclePort.runLifecycle`.
+1. Scheduler (`@Scheduled`, default 03:00) → `MemoryLifecyclePort.runLifecycle` (decay → archive → purge).
 2. **Decay**: single UPDATE, `LEFT JOIN memory_policies` with `COALESCE` to defaults, `strength -= decayRate × days_idle` beyond the grace period.
 3. **Archive**: data-modifying CTE (`DELETE … RETURNING … INSERT`) moves sub-threshold rows atomically into `shared_memories_archive`.
-4. Micrometer: `aether.memory.shared.decayed` / `.archived` counters, `.total` gauge.
+4. **Purge**: a single `DELETE` removes archived rows older than the tenant's `retention_days` (per-tenant `COALESCE`, global default) — the only lifecycle step that permanently deletes (storage limitation).
+5. Micrometer: `aether.memory.shared.decayed` / `.archived` / `.purged` counters, `.total` gauge.
+
+### 5.4 Data-subject governance (erasure + export)
+1. `DELETE /api/v1/tenants/{tenantId}/teams/{teamId}/memories` → `MemoryErasurePort.eraseTeam`: deletes the team's rows from both `shared_memories` and `shared_memories_archive`, returns the per-table counts. Tenant+team-scoped, idempotent (right to erasure).
+2. `GET /api/v1/tenants/{tenantId}/teams/{teamId}/memories/export` → `MemoryExportPort.exportTeam`: a read-only, **non-reinforcing** snapshot of the team's active + archived memories — content + metadata, embedding excluded (right to portability).
 
 ---
 
