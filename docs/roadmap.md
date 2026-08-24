@@ -57,16 +57,16 @@
 
 ---
 
-## Phase 3 — Governance & Policy UI
+## Phase 3 — Governance & Policy UI 🔄 (core complete)
 
 **Goal:** Full per-tenant governance surface and retention enforcement.
 
 | Deliverable | Status |
 |---|---|
-| Retention-window purge of archived memories | ⏳ |
-| Policy validation + change audit | ⏳ |
-| GDPR erasure across active + archive tables | ⏳ |
-| Bulk export API | ⏳ |
+| Retention-window purge of archived memories — a third lifecycle step (`PolicyAwareMemoryLifecycleService.purge`) permanently deletes archived memories past the tenant's `retention_days` window (per-tenant `COALESCE`, global default); metered `aether.memory.shared.purged` | ✅ |
+| GDPR erasure across active + archive tables — `MemoryErasurePort`/`JdbcMemoryErasureService` + `DELETE /api/v1/tenants/{tenantId}/teams/{teamId}/memories`; deletes a team's rows from both tables, tenant+team-scoped, idempotent, reports counts | ✅ |
+| Bulk export API — `MemoryExportPort`/`JdbcMemoryExportService` + `GET /api/v1/tenants/{tenantId}/teams/{teamId}/memories/export`; a read-only, **non-reinforcing** snapshot spanning active + archive (Art. 20 portability) | ✅ |
+| Policy validation + change audit | ⏳ (follow-up — `MemoryPolicy` already validates on construction; an append-only policy-change audit log remains) |
 
 ---
 

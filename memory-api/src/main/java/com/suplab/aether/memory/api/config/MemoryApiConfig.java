@@ -8,12 +8,16 @@ import com.suplab.aether.memory.engine.federation.HttpFederationPeerClient;
 import com.suplab.aether.memory.engine.federation.InMemoryFederationRateLimiter;
 import com.suplab.aether.memory.engine.federation.JdbcFederationAuditStore;
 import com.suplab.aether.memory.engine.federation.RedisFederationRateLimiter;
+import com.suplab.aether.memory.engine.governance.JdbcMemoryErasureService;
+import com.suplab.aether.memory.engine.governance.JdbcMemoryExportService;
 import com.suplab.aether.memory.engine.lifecycle.PolicyAwareMemoryLifecycleService;
 import com.suplab.aether.memory.engine.policy.JdbcMemoryPolicyStore;
 import com.suplab.aether.memory.engine.store.PGVectorSharedMemoryStore;
 import com.suplab.aether.memory.ports.FederationAuditStore;
 import com.suplab.aether.memory.ports.FederationPeerClient;
 import com.suplab.aether.memory.ports.FederationRateLimiter;
+import com.suplab.aether.memory.ports.MemoryErasurePort;
+import com.suplab.aether.memory.ports.MemoryExportPort;
 import com.suplab.aether.memory.ports.MemoryFederationPort;
 import com.suplab.aether.memory.ports.MemoryLifecyclePort;
 import com.suplab.aether.memory.ports.MemoryPolicyStore;
@@ -54,6 +58,23 @@ public class MemoryApiConfig {
     /**
      * Creates the per-tenant memory policy store backed by the {@code memory_policies} table.
      */
+    /**
+     * Creates the right-to-erasure service — deletes a team's active + archived memories (GDPR Art. 17).
+     */
+    @Bean
+    public MemoryErasurePort memoryErasurePort(NamedParameterJdbcTemplate jdbc) {
+        return new JdbcMemoryErasureService(jdbc);
+    }
+
+    /**
+     * Creates the data-portability export service — a read-only, non-reinforcing snapshot of a team's
+     * active + archived memories (GDPR Art. 20).
+     */
+    @Bean
+    public MemoryExportPort memoryExportPort(NamedParameterJdbcTemplate jdbc) {
+        return new JdbcMemoryExportService(jdbc);
+    }
+
     @Bean
     public MemoryPolicyStore memoryPolicyStore(NamedParameterJdbcTemplate jdbc) {
         return new JdbcMemoryPolicyStore(jdbc);
@@ -159,15 +180,17 @@ public class MemoryApiConfig {
      * @param defaultDecayRate        strength lost per idle day (default 0.01)
      * @param defaultDecayAfterDays   grace period in days (default 7)
      * @param defaultArchiveThreshold archive cutoff strength (default 0.1)
+     * @param defaultRetentionDays    archive retention window before purge (default 90)
      */
     @Bean
     public MemoryLifecyclePort memoryLifecyclePort(
             NamedParameterJdbcTemplate jdbc,
             @Value("${aether.memory.lifecycle.decay-rate:0.01}") double defaultDecayRate,
             @Value("${aether.memory.lifecycle.decay-after-days:7}") int defaultDecayAfterDays,
-            @Value("${aether.memory.lifecycle.archive-threshold:0.1}") double defaultArchiveThreshold) {
+            @Value("${aether.memory.lifecycle.archive-threshold:0.1}") double defaultArchiveThreshold,
+            @Value("${aether.memory.lifecycle.retention-days:90}") int defaultRetentionDays) {
         return new PolicyAwareMemoryLifecycleService(
-                jdbc, defaultDecayRate, defaultDecayAfterDays, defaultArchiveThreshold);
+                jdbc, defaultDecayRate, defaultDecayAfterDays, defaultArchiveThreshold, defaultRetentionDays);
     }
 
     /**
