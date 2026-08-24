@@ -102,7 +102,8 @@ Aether Memory owns the **Shared Memory** capability exclusively. Personal memory
 | `MEMORY_RETENTION_DAYS` | `90` | Default archive retention window before purge (tenants may override) |
 | `FEDERATION_RATE_LIMIT_MAX` | `60` | Max federation queries per origin per window |
 | `FEDERATION_RATE_LIMIT_WINDOW_SECONDS` | `60` | Rate-limit window length (seconds) |
-| `FEDERATION_RATE_LIMIT_BACKEND` | `memory` | `memory` (per-instance) or `redis` (shared across the fleet; degrades to per-node if Redis is down) |
+| `FEDERATION_RATE_LIMIT_BACKEND` | `memory` | `memory` (per-instance) or `redis` (shared across the fleet; behaviour on Redis outage set by `FEDERATION_RATE_LIMIT_FAIL_CLOSED`) |
+| `FEDERATION_RATE_LIMIT_FAIL_CLOSED` | `false` | On a Redis outage: `false` degrades to the per-node limiter (availability); `true` rejects (strict fail-closed) |
 | `REDIS_HOST` | `localhost` | Redis host — only used when the rate-limit backend is `redis` |
 | `REDIS_PORT` | `6379` | Redis port — only used when the rate-limit backend is `redis` |
 | `aether.memory.federation.peers` | _(empty)_ | Comma-separated peer base URLs for outbound fan-out (empty = local-only) |

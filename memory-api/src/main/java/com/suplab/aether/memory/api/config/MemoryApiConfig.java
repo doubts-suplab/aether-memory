@@ -92,14 +92,17 @@ public class MemoryApiConfig {
      * Creates the per-origin federation rate limiter. The backend is selected by
      * {@code aether.memory.federation.rate-limit.backend}: {@code memory} (default — a per-instance
      * fixed window) or {@code redis} (a <em>shared</em> fixed window across every instance, so an
-     * origin's budget is enforced fleet-wide). The Redis limiter degrades to a per-node in-memory
-     * limiter if Redis is unreachable, so a cache outage weakens throttling rather than removing it or
-     * blocking federation. Selecting {@code redis} needs a {@link StringRedisTemplate} (Spring Data
+     * origin's budget is enforced fleet-wide). On a Redis outage the shared limiter's behaviour is set
+     * by {@code aether.memory.federation.rate-limit.redis.fail-closed}: by default (false) it degrades
+     * to a per-node in-memory limiter (availability — a cache outage weakens throttling rather than
+     * removing it or blocking federation); set true to reject on an unreachable store (strict — never
+     * silently unlimited). Selecting {@code redis} needs a {@link StringRedisTemplate} (Spring Data
      * Redis, configured via {@code spring.data.redis.*}); if none is present it falls back to memory.
      *
      * @param maxPerWindow  maximum federation queries per origin per window (default 60)
      * @param windowSeconds window length in seconds (default 60)
      * @param backend       {@code memory} or {@code redis}
+     * @param failClosed    on Redis outage: reject (true) or degrade to per-node (false, default)
      * @param redisTemplate the Redis template (optional — absent unless the Redis starter is wired)
      */
     @Bean
@@ -107,13 +110,14 @@ public class MemoryApiConfig {
             @Value("${aether.memory.federation.rate-limit.max-per-window:60}") int maxPerWindow,
             @Value("${aether.memory.federation.rate-limit.window-seconds:60}") int windowSeconds,
             @Value("${aether.memory.federation.rate-limit.backend:memory}") String backend,
+            @Value("${aether.memory.federation.rate-limit.redis.fail-closed:false}") boolean failClosed,
             ObjectProvider<StringRedisTemplate> redisTemplate) {
         var local = new InMemoryFederationRateLimiter(maxPerWindow, windowSeconds);
         if ("redis".equalsIgnoreCase(backend)) {
             var template = redisTemplate.getIfAvailable();
             if (template != null) {
                 var store = new RedisDistributedRateLimitStore(template);
-                return new RedisFederationRateLimiter(store, maxPerWindow, windowSeconds, local);
+                return new RedisFederationRateLimiter(store, maxPerWindow, windowSeconds, local, failClosed);
             }
         }
         return local;
