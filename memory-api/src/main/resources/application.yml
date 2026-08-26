@@ -54,3 +54,7 @@ aether:
         backend: ${FEDERATION_RATE_LIMIT_BACKEND:memory}
         max-per-window: ${FEDERATION_RATE_LIMIT_MAX:60}
         window-seconds: ${FEDERATION_RATE_LIMIT_WINDOW_SECONDS:60}
+        redis:
+          # On a Redis outage: false (default) degrades to the per-node limiter (availability);
+          # true rejects the request (strict fail-closed — never silently unlimited).
+          fail-closed: ${FEDERATION_RATE_LIMIT_FAIL_CLOSED:false}

@@ -32,7 +32,7 @@ class RedisFederationRateLimiterTest {
     @Test
     void admitsUpToMax_thenRejects_withinAWindow() {
         var limiter = new RedisFederationRateLimiter(new FakeStore(), 3, 60,
-                new CountingFallback(), () -> 1_000L);
+                new CountingFallback(), false, () -> 1_000L);
 
         assertThat(limiter.tryAcquire("origin")).isTrue();   // 1
         assertThat(limiter.tryAcquire("origin")).isTrue();   // 2
@@ -44,7 +44,7 @@ class RedisFederationRateLimiterTest {
     void budgetResetsOnNextWindow() {
         var now = new AtomicLong(1_000L);
         var limiter = new RedisFederationRateLimiter(new FakeStore(), 2, 60,
-                new CountingFallback(), now::get);
+                new CountingFallback(), false, now::get);
 
         assertThat(limiter.tryAcquire("o")).isTrue();
         assertThat(limiter.tryAcquire("o")).isTrue();
@@ -57,7 +57,7 @@ class RedisFederationRateLimiterTest {
     @Test
     void separatesOriginsIntoDistinctBudgets() {
         var limiter = new RedisFederationRateLimiter(new FakeStore(), 1, 60,
-                new CountingFallback(), () -> 1_000L);
+                new CountingFallback(), false, () -> 1_000L);
 
         assertThat(limiter.tryAcquire("a")).isTrue();
         assertThat(limiter.tryAcquire("b")).isTrue();   // b has its own budget
@@ -70,10 +70,23 @@ class RedisFederationRateLimiterTest {
             throw new IllegalStateException("redis down");
         };
         var fallback = new CountingFallback();
-        var limiter = new RedisFederationRateLimiter(failing, 5, 60, fallback, () -> 1_000L);
+        var limiter = new RedisFederationRateLimiter(failing, 5, 60, fallback, false, () -> 1_000L);
 
         assertThat(limiter.tryAcquire("origin")).isTrue();  // fallback returns true
         assertThat(fallback.calls).isEqualTo(1);            // and it was actually consulted
+    }
+
+    @Test
+    void storeFailure_failClosed_rejectsWithoutConsultingFallback() {
+        DistributedRateLimitStore failing = (key, ttl) -> {
+            throw new IllegalStateException("redis down");
+        };
+        var fallback = new CountingFallback();
+        // failClosed=true: an unreachable store rejects (never silently unlimited) and never degrades.
+        var limiter = new RedisFederationRateLimiter(failing, 5, 60, fallback, true);
+
+        assertThat(limiter.tryAcquire("origin")).isFalse();  // fail-closed → rejected
+        assertThat(fallback.calls).isZero();                 // the fallback was NOT consulted
     }
 
     @Test

@@ -1,0 +1,21 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aether-memory-config
+  namespace: {{ include "aether-memory.namespace" . }}
+  labels:
+    {{- include "aether-memory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: shared-memory-engine
+data:
+  ollama-base-url: {{ .Values.app.config.ollamaBaseUrl | quote }}
+  embedding-enabled: {{ .Values.app.config.embeddingEnabled | quote }}
+  embedding-model: {{ .Values.app.config.embeddingModel | quote }}
+  decay-enabled: {{ .Values.app.config.decayEnabled | quote }}
+  decay-cron: {{ .Values.app.config.decayCron | quote }}
+  retention-days: {{ .Values.app.config.retentionDays | quote }}
+  federation-require-auth: {{ .Values.app.config.federationRequireAuth | quote }}
+  federation-rate-limit-backend: {{ .Values.app.config.federationRateLimitBackend | quote }}
+  federation-rate-limit-fail-closed: {{ .Values.app.config.federationRateLimitFailClosed | quote }}
+  redis-host: {{ .Values.app.config.redisHost | quote }}
+  redis-port: {{ .Values.app.config.redisPort | quote }}
+  spring-profiles-active: {{ .Values.app.config.springProfilesActive | quote }}

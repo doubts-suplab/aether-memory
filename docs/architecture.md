@@ -63,6 +63,7 @@ FederationAuditEvent = (originTenantId, type?, queryLabel≤120, resultCount, oc
 |---|---|---|
 | `SharedMemoryStore` | `PGVectorSharedMemoryStore` | Persist/retrieve team memory; reinforce on read; `contribute` (distinct-contributor signal); federatable fan-out |
 | `MemoryPolicyStore` | `JdbcMemoryPolicyStore` | Resolve/save per-tenant policy (defaults when unset), incl. redaction depth |
+| `PolicyChangeAuditStore` | `JdbcPolicyChangeAuditStore` | Append-only, tenant-scoped log of accepted policy changes — a bounded `field: old → new` delta per change (no secrets, no content) |
 | `MemoryFederationPort` | `DefaultMemoryFederationService` | Privacy-preserving cross-instance query + peer fan-out; per-owner redaction; audits every query |
 | `FederationAuditStore` | `JdbcFederationAuditStore` | Append-only log of served federation queries |
 | `FederationRateLimiter` | `InMemoryFederationRateLimiter` (default) / `RedisFederationRateLimiter` | Per-origin fixed-window throttle on `/federation/query`; the Redis backend shares one window across the fleet (via `DistributedRateLimitStore`) and degrades to per-node on Redis failure |
@@ -84,6 +85,7 @@ FederationAuditEvent = (originTenantId, type?, queryLabel≤120, resultCount, oc
 | `V003` | `memory_policies` | One configurable policy per tenant; overrides only |
 | `V004` | `shared_memories_archive` | Faded memories moved here (keeps embedding for restore) |
 | `V005` | `federation_audit` + `memory_policies.federation_summary_chars` | Append-only federation-query audit; per-tenant redaction depth (0–280) |
+| `V006` | `policy_change_audit` | Append-only policy-change log; index on `(tenant_id, occurred_at DESC)` |
 
 All embeddings are 384-dim (all-MiniLM-L6-v2), consistent across the ecosystem.
 
@@ -116,6 +118,10 @@ All embeddings are 384-dim (all-MiniLM-L6-v2), consistent across the ecosystem.
 1. `DELETE /api/v1/tenants/{tenantId}/teams/{teamId}/memories` → `MemoryErasurePort.eraseTeam`: deletes the team's rows from both `shared_memories` and `shared_memories_archive`, returns the per-table counts. Tenant+team-scoped, idempotent (right to erasure).
 2. `GET /api/v1/tenants/{tenantId}/teams/{teamId}/memories/export` → `MemoryExportPort.exportTeam`: a read-only, **non-reinforcing** snapshot of the team's active + archived memories — content + metadata, embedding excluded (right to portability).
 
+### 5.5 Policy-change audit
+1. `PUT /api/v1/tenants/{tenantId}/memory-policy` resolves the tenant's current policy, validates + saves the new one, then appends a `PolicyChangeEvent` via `PolicyChangeAuditStore.record` — `PolicyChangeEvent.describe(before, after)` builds a bounded `field: old → new` delta over the governance scalars only, attributed to an optional `X-Actor` header. An out-of-range value is a 400 and records nothing.
+2. `GET /api/v1/tenants/{tenantId}/memory-policy/audit` → `recentForTenant`: the tenant's change history, newest first. Write-once — no update or delete path; stores no secrets or memory content.
+
 ---
 
 ## 6. Multi-Tenancy & Privacy
@@ -135,3 +141,9 @@ Reads from environment variables (never hardcoded). Defaults target local Docker
 ## 8. Standalone Guarantee
 
 Aether Memory has no compile-time or runtime dependency on Core or Grid. It boots, migrates, serves, and runs its lifecycle entirely on its own PostgreSQL schema (`aether_memory`).
+
+---
+
+## 9. Deployment (Kubernetes / Helm)
+
+The production Helm chart at `memory-infra/helm/aether-memory/` mirrors the Core, Vault, and Flow charts: a namespace, a service-account with `automountServiceAccountToken: false`, a configmap (ollama/embedding/lifecycle/federation/redis config), a ClusterIP service on 8083, and a hardened deployment — non-root uid 1000, read-only root filesystem, all capabilities dropped, topology spread by zone, startup/liveness/readiness probes on `/actuator/health/*`, and a `checksum/config` annotation that rolls pods when the configmap changes. An HPA scales 2→8 on 70% CPU; ingress, an OpenShift Route, and a Prometheus ServiceMonitor are opt-in. Three value sets cover vanilla Kubernetes, AWS EKS (ALB ingress + IRSA), and OpenShift (Route + SCC). Database credentials are never in-chart — the deployment reads `postgres-*` from a pre-existing `existingSecret`, with optional `federation-auth-token` / `federation-peer-auth-token` for federation auth. The `helm-release.yml` workflow lints all value sets, dry-runs `helm template`, and publishes the packaged chart to GHCR as an OCI artifact on `main`.

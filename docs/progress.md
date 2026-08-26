@@ -5,15 +5,54 @@
 
 ---
 
-**Active Phase:** Phase 3 — Governance & Policy 🔄 core complete (retention-window purge of archived memories + GDPR team erasure across active+archive + non-reinforcing bulk export; policy change-audit follow-up)
+**Active Phase:** Phase 4 — Kubernetes + Helm 🔄 core complete (production Helm chart + release workflow); Phase 3 now fully core-complete with the policy-change audit log delivered
 
 | Phase | Name | Status | Sessions |
 |---|---|---|---|
 | 0 | Scaffold | ✅ Complete | 1 |
 | 1 | Shared Memory Engine | ✅ Complete | 2 |
 | 2 | Federation | ✅ Core complete (audit + rate-limit + redaction + peer fan-out + peer auth + distributed limiter) | 4 |
-| 3 | Governance & Policy | 🔄 Core complete (retention purge + GDPR erasure + bulk export; policy-audit follow-up) | 5 |
-| 4 | Kubernetes + Helm | ⏳ Planned | — |
+| 3 | Governance & Policy | ✅ Core complete (retention purge + GDPR erasure + bulk export + policy-change audit) | 5, 6 |
+| 4 | Kubernetes + Helm | 🔄 Core complete (Helm chart + release workflow) | 6 |
+
+---
+
+## Phase 4 — Kubernetes + Helm + Phase 3 policy-change audit 🔄 (session 6)
+
+**Commit:** `feat(memory): policy-change audit log + production Helm chart`
+
+Closes the last Phase 3 follow-up and stands up production deployment.
+
+### Policy-change audit log (Phase 3 follow-up — done)
+- `PolicyChangeEvent` (domain) — an append-only record of an accepted policy change: tenant, an
+  optional bounded `actor` label, a bounded human-readable `summary`, and `occurredAt`. Its
+  `describe(before, after)` builds a `field: old → new` delta across only the changed governance
+  scalars (no secrets, no content); `MAX_SUMMARY`/`MAX_ACTOR` truncation on construction.
+- `PolicyChangeAuditStore` port + `JdbcPolicyChangeAuditStore` (engine) over V006
+  `policy_change_audit` — write-once `INSERT` + a tenant-scoped, newest-first `SELECT`; explicit
+  column lists and named parameters.
+- `MemoryPolicyController.replace` resolves the previous policy, saves the new one, then records the
+  delta attributed to an optional `X-Actor` header. `GET /api/v1/tenants/{tenantId}/memory-policy/audit`
+  returns the bounded history (actor shown as `unattributed` when absent). `MemoryPolicy` continues
+  to validate on construction — an out-of-range `PUT` is a 400 and records nothing.
+
+### Phase 4 — Kubernetes + Helm (core complete)
+- Production Helm chart at `memory-infra/helm/aether-memory/` mirroring the Core/Vault/Flow charts:
+  namespace, service-account (`automountServiceAccountToken: false`), configmap
+  (ollama/embedding/lifecycle/federation/redis config), ClusterIP service (8083), hardened deployment
+  (non-root uid 1000, read-only rootfs, dropped caps, topology spread by zone,
+  startup/liveness/readiness probes, `checksum/config` rollout), HPA (min 2 / max 8 / CPU 70%),
+  ingress, OpenShift Route, ServiceMonitor, NOTES.
+- Value sets: vanilla / AWS EKS (ALB + IRSA) / OpenShift (Route + SCC). Secrets never in-chart — the
+  pods read `postgres-*` from a pre-existing `existingSecret`, with optional `federation-auth-token` /
+  `federation-peer-auth-token` when federation auth is enabled.
+- `helm-release.yml` — lints all three value sets + `helm template` dry-run, then packages and pushes
+  the chart to GHCR as an OCI artifact on main (SHA-pinned actions).
+
+### Constraints upheld
+- The audit is tenant-scoped (`WHERE tenant_id`) and write-once — no cross-tenant read, no update or
+  delete path. It stores a bounded delta only — no secrets, no memory content, no team identity.
+- Memory still runs standalone: federation auth off by default; chart secrets externalised.
 
 ---
 
