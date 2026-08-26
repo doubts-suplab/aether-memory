@@ -12,6 +12,7 @@ import com.suplab.aether.memory.engine.governance.JdbcMemoryErasureService;
 import com.suplab.aether.memory.engine.governance.JdbcMemoryExportService;
 import com.suplab.aether.memory.engine.lifecycle.PolicyAwareMemoryLifecycleService;
 import com.suplab.aether.memory.engine.policy.JdbcMemoryPolicyStore;
+import com.suplab.aether.memory.engine.policy.JdbcPolicyChangeAuditStore;
 import com.suplab.aether.memory.engine.store.PGVectorSharedMemoryStore;
 import com.suplab.aether.memory.ports.FederationAuditStore;
 import com.suplab.aether.memory.ports.FederationPeerClient;
@@ -21,6 +22,7 @@ import com.suplab.aether.memory.ports.MemoryExportPort;
 import com.suplab.aether.memory.ports.MemoryFederationPort;
 import com.suplab.aether.memory.ports.MemoryLifecyclePort;
 import com.suplab.aether.memory.ports.MemoryPolicyStore;
+import com.suplab.aether.memory.ports.PolicyChangeAuditStore;
 import com.suplab.aether.memory.ports.SharedMemoryStore;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
@@ -78,6 +80,14 @@ public class MemoryApiConfig {
     @Bean
     public MemoryPolicyStore memoryPolicyStore(NamedParameterJdbcTemplate jdbc) {
         return new JdbcMemoryPolicyStore(jdbc);
+    }
+
+    /**
+     * Creates the append-only policy-change audit store ({@code policy_change_audit} table).
+     */
+    @Bean
+    public PolicyChangeAuditStore policyChangeAuditStore(NamedParameterJdbcTemplate jdbc) {
+        return new JdbcPolicyChangeAuditStore(jdbc);
     }
 
     /**

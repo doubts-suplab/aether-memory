@@ -1,0 +1,22 @@
+{{- if .Values.openshift.enabled -}}
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: aether-memory
+  namespace: {{ include "aether-memory.namespace" . }}
+  labels:
+    {{- include "aether-memory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: shared-memory-engine
+spec:
+  host: {{ .Values.route.host }}
+  to:
+    kind: Service
+    name: aether-memory
+    weight: 100
+  port:
+    targetPort: http
+  tls:
+    termination: {{ .Values.route.termination }}
+    insecureEdgeTerminationPolicy: {{ .Values.route.insecureEdgeTerminationPolicy }}
+  wildcardPolicy: None
+{{- end }}

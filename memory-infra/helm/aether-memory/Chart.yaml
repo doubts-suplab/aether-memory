@@ -1,0 +1,15 @@
+apiVersion: v2
+name: aether-memory
+description: Aether Memory — Shared Memory Platform (team memory, federation, per-tenant governance policy)
+type: application
+version: 0.1.0
+appVersion: 0.1.0-SNAPSHOT
+keywords:
+  - aether
+  - shared-memory
+  - federation
+  - governance
+  - spring-boot
+maintainers:
+  - name: Suplab
+    email: maintainers@suplab.dev

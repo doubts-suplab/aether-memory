@@ -1,0 +1,200 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aether-memory
+  namespace: {{ include "aether-memory.namespace" . }}
+  labels:
+    {{- include "aether-memory.labels" . | nindent 4 }}
+    app.kubernetes.io/component: shared-memory-engine
+spec:
+  replicas: {{ .Values.app.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: aether-memory
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: aether-memory
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+        app.kubernetes.io/part-of: aether-memory
+        app.kubernetes.io/component: shared-memory-engine
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8083"
+        prometheus.io/path: "/actuator/prometheus"
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "aether-memory.app.serviceAccountName" . }}
+      automountServiceAccountToken: false
+
+      securityContext:
+        runAsNonRoot: true
+        {{- if not .Values.openshift.enabled }}
+        runAsUser: 1000
+        fsGroup: 1000
+        {{- end }}
+
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app.kubernetes.io/name: aether-memory
+              app.kubernetes.io/instance: {{ .Release.Name }}
+
+      containers:
+        - name: aether-memory
+          image: {{ include "aether-memory.app.image" . }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8083
+              protocol: TCP
+
+          securityContext:
+            runAsNonRoot: true
+            {{- if not .Values.openshift.enabled }}
+            runAsUser: 1000
+            {{- end }}
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+
+          resources:
+            {{- toYaml .Values.app.resources | nindent 12 }}
+
+          env:
+            # ── Secrets ───────────────────────────────────────────────────────
+            - name: POSTGRES_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.secrets.existingSecret }}
+                  key: postgres-url
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.secrets.existingSecret }}
+                  key: postgres-user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.secrets.existingSecret }}
+                  key: postgres-password
+            # Optional — present only when federation auth is enabled.
+            - name: FEDERATION_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.secrets.existingSecret }}
+                  key: federation-auth-token
+                  optional: true
+            - name: FEDERATION_PEER_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.secrets.existingSecret }}
+                  key: federation-peer-auth-token
+                  optional: true
+            # ── ConfigMap ─────────────────────────────────────────────────────
+            - name: OLLAMA_BASE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: aether-memory-config
+                  key: ollama-base-url
+            - name: EMBEDDING_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: aether-memory-config
+                  key: embedding-enabled
+            - name: EMBEDDING_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: aether-memory-config
+                  key: embedding-model
+            - name: MEMORY_DECAY_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: aether-memory-config
+                  key: decay-enabled
+            - name: MEMORY_DECAY_CRON
+              valueFrom:
+                configMapKeyRef:
+                  name: aether-memory-config
+                  key: decay-cron
+            - name: MEMORY_RETENTION_DAYS
+              valueFrom:
+                configMapKeyRef:
+                  name: aether-memory-config
+                  key: retention-days
+            - name: FEDERATION_REQUIRE_AUTH
+              valueFrom:
+                configMapKeyRef:
+                  name: aether-memory-config
+                  key: federation-require-auth
+            - name: FEDERATION_RATE_LIMIT_BACKEND
+              valueFrom:
+                configMapKeyRef:
+                  name: aether-memory-config
+                  key: federation-rate-limit-backend
+            - name: FEDERATION_RATE_LIMIT_FAIL_CLOSED
+              valueFrom:
+                configMapKeyRef:
+                  name: aether-memory-config
+                  key: federation-rate-limit-fail-closed
+            - name: REDIS_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: aether-memory-config
+                  key: redis-host
+            - name: REDIS_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: aether-memory-config
+                  key: redis-port
+            - name: SPRING_PROFILES_ACTIVE
+              valueFrom:
+                configMapKeyRef:
+                  name: aether-memory-config
+                  key: spring-profiles-active
+
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8083
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 12
+
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8083
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8083
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: tmp
+          emptyDir: {}

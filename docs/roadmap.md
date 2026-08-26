@@ -66,20 +66,21 @@
 | Retention-window purge of archived memories — a third lifecycle step (`PolicyAwareMemoryLifecycleService.purge`) permanently deletes archived memories past the tenant's `retention_days` window (per-tenant `COALESCE`, global default); metered `aether.memory.shared.purged` | ✅ |
 | GDPR erasure across active + archive tables — `MemoryErasurePort`/`JdbcMemoryErasureService` + `DELETE /api/v1/tenants/{tenantId}/teams/{teamId}/memories`; deletes a team's rows from both tables, tenant+team-scoped, idempotent, reports counts | ✅ |
 | Bulk export API — `MemoryExportPort`/`JdbcMemoryExportService` + `GET /api/v1/tenants/{tenantId}/teams/{teamId}/memories/export`; a read-only, **non-reinforcing** snapshot spanning active + archive (Art. 20 portability) | ✅ |
-| Policy validation + change audit | ⏳ (follow-up — `MemoryPolicy` already validates on construction; an append-only policy-change audit log remains) |
+| Policy validation + change audit — `MemoryPolicy` validates on construction; an **append-only policy-change audit log** now records every accepted `PUT` (`PolicyChangeEvent` + `PolicyChangeAuditStore`/`JdbcPolicyChangeAuditStore`, V006 `policy_change_audit`): a bounded, human-readable delta (previous → new per field) attributed to an optional `X-Actor`, exposed newest-first via `GET /api/v1/tenants/{tenantId}/memory-policy/audit`; write-once, tenant-scoped | ✅ |
 
 ---
 
-## Phase 4 — Kubernetes + Helm
+## Phase 4 — Kubernetes + Helm 🔄 (core complete)
 
 **Goal:** Production-ready deployment.
 
 | Deliverable | Status |
 |---|---|
 | Multi-stage Dockerfile (Temurin 21 JRE, non-root uid 1000) | ✅ (scaffolded) |
-| Helm chart `memory-infra/helm/aether-memory/` | ⏳ |
-| HPA (min 2, max 8 replicas) | ✅ (manifest) |
-| Docker build + Helm release workflows | ⏳ |
+| Helm chart `memory-infra/helm/aether-memory/` — namespace, service-account (token disabled), configmap (ollama/embedding/lifecycle/federation/redis config), ClusterIP service (8083), deployment (non-root uid 1000, read-only rootfs, dropped caps, topology spread by zone, startup/liveness/readiness probes, config-checksum rollout), Route (OpenShift), ServiceMonitor, NOTES; secrets never in-chart (pre-existing `existingSecret`, optional federation tokens) | ✅ |
+| HPA (min 2, max 8 replicas, CPU 70%) | ✅ |
+| Value sets — vanilla / AWS EKS (ALB + IRSA) / OpenShift (Route + SCC) | ✅ |
+| Docker build + Helm release workflows (`helm-release.yml` — lints all value sets + `helm template` dry-run, packages + pushes the chart to GHCR as an OCI artifact on main) | ✅ |
 
 ---
 

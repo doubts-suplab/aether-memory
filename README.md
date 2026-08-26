@@ -40,7 +40,8 @@ cd ../.. && mvn spring-boot:run -pl memory-api
 | `GET` | `/api/v1/tenants/{tenantId}/teams/{teamId}/memories/export` | Data-portability export — a non-reinforcing snapshot of a team's active + archived memories (GDPR Art. 20) |
 | `POST` | `/api/v1/federation/query` | Privacy-preserving cross-instance query — optional per-peer bearer auth (401 when required + missing/invalid), rate-limited per origin; `"includePeers": true` fans out to configured peer instances |
 | `GET` | `/api/v1/federation/audit` | Recent federation-query audit (who queried, what type, how many results) |
-| `GET`/`PUT` | `/api/v1/tenants/{tenantId}/memory-policy` | Read / replace a tenant's governance policy (incl. `federationSummaryChars` redaction depth) |
+| `GET`/`PUT` | `/api/v1/tenants/{tenantId}/memory-policy` | Read / replace a tenant's governance policy (incl. `federationSummaryChars` redaction depth); a `PUT` appends to the policy-change audit log (attributed to an optional `X-Actor` header) |
+| `GET` | `/api/v1/tenants/{tenantId}/memory-policy/audit` | Append-only policy-change history — a bounded `field: old → new` delta per accepted change, who made it, and when |
 | `GET` | `/actuator/health` | Liveness + readiness probes |
 
 ## Memory Model
@@ -71,6 +72,14 @@ Every team retrieval reinforces a memory (strength up by the tenant's configured
 ### Governance — right to erasure & portability
 
 A team's memories can be **erased** (`DELETE …/teams/{teamId}/memories`) or **exported** (`GET …/teams/{teamId}/memories/export`) on a data-subject request. Both span the active store *and* the archive so faded memories are not overlooked. Erasure is tenant+team-scoped and idempotent, reporting the counts removed from each table; export is read-only and **non-reinforcing** (it never raises a memory's strength) and excludes the raw embedding vector.
+
+### Governance — policy-change audit
+
+Every accepted change to a tenant's governance policy is recorded in an **append-only audit log**. A `PUT …/memory-policy` resolves the current policy, applies the new one, and appends a bounded `field: old → new` delta (retention, decay, federation toggle, redaction depth, …) attributed to an optional `X-Actor` header — the levers that decide what data survives and what may leave the tenancy boundary are demonstrable after the fact. `GET …/memory-policy/audit` returns that history newest-first, tenant-scoped; the log is write-once (no update or delete path) and stores no secrets or memory content.
+
+### Deployment (Kubernetes / Helm)
+
+A production Helm chart lives at `memory-infra/helm/aether-memory/` (mirroring the Core, Vault, and Flow charts): namespace, service-account (token disabled), configmap, ClusterIP service (8083), a hardened deployment (non-root uid 1000, read-only rootfs, dropped capabilities, topology spread by zone, startup/liveness/readiness probes, config-checksum rollout), HPA (min 2 / max 8 / CPU 70%), ingress, OpenShift Route, and a ServiceMonitor. Value sets ship for vanilla Kubernetes, AWS EKS (ALB + IRSA), and OpenShift (Route + SCC). Secrets are never in-chart — the pods read `postgres-*` from a pre-existing `existingSecret` (plus optional `federation-auth-token` / `federation-peer-auth-token`). The `helm-release.yml` workflow lints every value set, dry-runs `helm template`, and packages + pushes the chart to GHCR as an OCI artifact on `main`.
 
 ## Ecosystem
 
